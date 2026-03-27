@@ -1,8 +1,19 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Tailwind CSS v4 진입점 */
+@import "tailwindcss";
 
-/* Pretendard 웹폰트 로드 */
+/*
+ * tailwind.config.js 로드 (v4 @config 지시어)
+ * - colors, spacing, fontSize, borderRadius, boxShadow, fontFamily, darkMode 모두 여기서 적용
+ * - 경로: globals.css(src/styles/) → 루트(tailwind.config.js) = ../../
+ */
+@config "../../tailwind.config.js";
+
+/* ── 다크모드 클래스 기반 변형 ─────────────────────────────────
+   useThemeToggle 훅이 <html>에 .dark 클래스를 붙이는 방식에 맞춤
+   @config의 darkMode: 'class' 설정을 v4 방식으로 보강 */
+@variant dark (&:where(.dark, .dark *));
+
+/* ── Pretendard 웹폰트 ──────────────────────────────────────── */
 @font-face {
   font-family: 'Pretendard';
   src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Regular.woff2') format('woff2');
@@ -17,7 +28,7 @@
   font-display: swap;
 }
 
-/* Body 기본 폰트 */
+/* ── 전역 기본 스타일 ───────────────────────────────────────── */
 body {
   font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
 }

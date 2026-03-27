@@ -1,0 +1,74 @@
+'use client';
+
+import { useState, useCallback } from 'react';
+import { Sidebar } from './Sidebar';
+import { Header } from './Header';
+import type { UserProfile, Notification } from '@/types/dashboard';
+
+interface DashboardLayoutProps {
+  children: React.ReactNode;
+  currentUser: UserProfile;
+  pageTitle?: string;
+  notifications?: Notification[];
+}
+
+/**
+ * 대시보드 공통 레이아웃
+ * Sidebar + Header + Main Content 구조
+ *
+ * - mobileOpen 상태: Header(햄버거 버튼) ↔ Sidebar(슬라이드인) 공유
+ * - notifications 상태: 읽음 처리를 포함한 알림 목록 관리
+ */
+export const DashboardLayout = ({
+  children,
+  currentUser,
+  pageTitle = '대시보드',
+  notifications: initialNotifications = [],
+}: DashboardLayoutProps) => {
+  const [activeMenu, setActiveMenu] = useState('dashboard');
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
+
+  /** 단건 읽음 처리 */
+  const handleMarkRead = useCallback((id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
+    );
+  }, []);
+
+  /** 전체 읽음 처리 */
+  const handleMarkAllRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+  }, []);
+
+  return (
+    /* h-screen: 사이드바·헤더 고정, 메인 영역만 수직 스크롤 */
+    <div className="h-screen bg-light-background dark:bg-dark-background flex overflow-hidden">
+      <Sidebar
+        currentUser={currentUser}
+        activeMenu={activeMenu}
+        onMenuChange={setActiveMenu}
+        mobileOpen={mobileOpen}
+        onMobileClose={() => setMobileOpen(false)}
+      />
+
+      {/* 메인 영역 (헤더 고정 + 본문 스크롤) */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <Header
+          currentUser={currentUser}
+          pageTitle={pageTitle}
+          notifications={notifications}
+          onMarkRead={handleMarkRead}
+          onMarkAllRead={handleMarkAllRead}
+          mobileMenuOpen={mobileOpen}
+          onMobileMenuToggle={() => setMobileOpen((prev) => !prev)}
+        />
+
+        {/* 본문 스크롤 컨테이너 */}
+        <main className="flex-1 overflow-y-auto p-sm md:p-md xl:p-lg">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+};
