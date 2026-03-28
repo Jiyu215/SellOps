@@ -11,6 +11,30 @@ import type {
   Notification,
 } from '@/types/dashboard';
 
+// ── 실시간 날짜 헬퍼 ──────────────────────────────────────
+const _now = new Date();
+
+/** n일 전 날짜를 'M/D' 형식으로 반환 (단기 차트 라벨용) */
+const _dayLabel = (daysAgo: number): string => {
+  const d = new Date(_now);
+  d.setDate(d.getDate() - daysAgo);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+};
+
+/** n개월 전의 "'YY.M" 형식 라벨 반환 (장기 차트 라벨용) */
+const _monthLabel = (monthsAgo: number): string => {
+  const d = new Date(_now.getFullYear(), _now.getMonth() - monthsAgo, 1);
+  return `'${String(d.getFullYear()).slice(2)}.${d.getMonth() + 1}`;
+};
+
+/** n일 전 특정 시각의 ISO 문자열 반환 */
+const _isoAt = (daysAgo: number, hour: number, minute: number): string => {
+  const d = new Date(_now);
+  d.setDate(d.getDate() - daysAgo);
+  d.setHours(hour, minute, 0, 0);
+  return d.toISOString();
+};
+
 // ── 현재 로그인 유저 ──────────────────────────────────────
 export const MOCK_USER: UserProfile = {
   id: 'u-001',
@@ -20,7 +44,7 @@ export const MOCK_USER: UserProfile = {
   avatarUrl: undefined,
 };
 
-// ── KPI 카드 (스펙: 3개) — 오늘(2026-03-27) 기준 ────────
+// ── KPI 카드 (스펙: 3개) — 오늘 기준 ─────────────────────
 export const MOCK_KPI_DATA: KPICardData[] = [
   {
     id: 'kpi-revenue',
@@ -53,16 +77,16 @@ export const MOCK_KPI_DATA: KPICardData[] = [
   },
 ];
 
-// ── 단기 추이 (최근 7일: 3/21 ~ 3/27) ───────────────────
-// 3/23: 급감(-53% → DROP), 3/26: 급등(+32% → GROWTH)
+// ── 단기 추이 (최근 7일: D-6 ~ 오늘) ─────────────────────
+// D-4: 급감(-53% → DROP), D-1: 급등(+32% → GROWTH)
 export const MOCK_DAILY_DATA: DailyDataPoint[] = [
-  { date: '3/21', revenue: 1850000, orders: 47, stockRiskCount: 6 },
-  { date: '3/22', revenue: 2100000, orders: 54, stockRiskCount: 6 },
-  { date: '3/23', revenue: 980000,  orders: 28, stockRiskCount: 7 },
-  { date: '3/24', revenue: 1750000, orders: 45, stockRiskCount: 7 },
-  { date: '3/25', revenue: 2380000, orders: 62, stockRiskCount: 7 },
-  { date: '3/26', revenue: 3150000, orders: 84, stockRiskCount: 7 },
-  { date: '3/27', revenue: 2650000, orders: 71, stockRiskCount: 7 },
+  { date: _dayLabel(6), revenue: 1850000, orders: 47, stockRiskCount: 6 },
+  { date: _dayLabel(5), revenue: 2100000, orders: 54, stockRiskCount: 6 },
+  { date: _dayLabel(4), revenue: 980000,  orders: 28, stockRiskCount: 7 },
+  { date: _dayLabel(3), revenue: 1750000, orders: 45, stockRiskCount: 7 },
+  { date: _dayLabel(2), revenue: 2380000, orders: 62, stockRiskCount: 7 },
+  { date: _dayLabel(1), revenue: 3150000, orders: 84, stockRiskCount: 7 },
+  { date: _dayLabel(0), revenue: 2650000, orders: 71, stockRiskCount: 7 },
 ];
 
 // ── 인기 상품 Top 5 (기간별) ──────────────────────────────
@@ -90,38 +114,38 @@ export const MOCK_TOP_PRODUCTS: Record<TopProductPeriod, TopProductItem[]> = {
   ],
 };
 
-// ── 장기 추이 (최근 24개월: '24.4 ~ '26.3) ───────────────
-// 12개월 뷰: 마지막 12개 항목 사용 ('25.4 ~ '26.3)
+// ── 장기 추이 (최근 24개월: 현재 기준) ───────────────────
+// 12개월 뷰: 마지막 12개 항목 사용
 // 24개월 뷰: 전체 24개 항목 사용
 // YoY 비교: index N vs index N-12 (동년 동월)
 export const MOCK_SALES_DATA: SalesDataPoint[] = [
-  // ── 2024년 (4월~12월) ──
-  { month: "'24.4",  revenue: 25000000, orders: 645,  target: 28000000 },
-  { month: "'24.5",  revenue: 28500000, orders: 720,  target: 28000000 },
-  { month: "'24.6",  revenue: 27000000, orders: 685,  target: 29000000 },
-  { month: "'24.7",  revenue: 31000000, orders: 790,  target: 30000000 },
-  { month: "'24.8",  revenue: 33500000, orders: 850,  target: 31000000 },
-  { month: "'24.9",  revenue: 29000000, orders: 740,  target: 31000000 },
-  { month: "'24.10", revenue: 35000000, orders: 890,  target: 33000000 },
-  { month: "'24.11", revenue: 42000000, orders: 1050, target: 38000000 },
-  { month: "'24.12", revenue: 51000000, orders: 1280, target: 45000000 },
-  // ── 2025년 (1월~12월) ──
-  { month: "'25.1",  revenue: 29000000, orders: 735,  target: 32000000 },
-  { month: "'25.2",  revenue: 26000000, orders: 680,  target: 32000000 },
-  { month: "'25.3",  revenue: 37000000, orders: 940,  target: 35000000 },
-  { month: "'25.4",  revenue: 34000000, orders: 870,  target: 36000000 },
-  { month: "'25.5",  revenue: 39000000, orders: 990,  target: 38000000 },
-  { month: "'25.6",  revenue: 43000000, orders: 1090, target: 40000000 },
-  { month: "'25.7",  revenue: 38000000, orders: 970,  target: 40000000 },
-  { month: "'25.8",  revenue: 44000000, orders: 1110, target: 42000000 },
-  { month: "'25.9",  revenue: 41000000, orders: 1050, target: 42000000 },
-  { month: "'25.10", revenue: 47000000, orders: 1190, target: 44000000 },
-  { month: "'25.11", revenue: 55000000, orders: 1380, target: 48000000 },
-  { month: "'25.12", revenue: 63000000, orders: 1580, target: 55000000 },
-  // ── 2026년 (1월~3월) ──
-  { month: "'26.1",  revenue: 32000000, orders: 856,  target: 35000000 },
-  { month: "'26.2",  revenue: 28500000, orders: 742,  target: 35000000 },
-  { month: "'26.3",  revenue: 48250000, orders: 1284, target: 45000000 },
+  // ── 24개월 전 ~ 13개월 전 ──
+  { month: _monthLabel(23), revenue: 25000000, orders: 645,  target: 28000000 },
+  { month: _monthLabel(22), revenue: 28500000, orders: 720,  target: 28000000 },
+  { month: _monthLabel(21), revenue: 27000000, orders: 685,  target: 29000000 },
+  { month: _monthLabel(20), revenue: 31000000, orders: 790,  target: 30000000 },
+  { month: _monthLabel(19), revenue: 33500000, orders: 850,  target: 31000000 },
+  { month: _monthLabel(18), revenue: 29000000, orders: 740,  target: 31000000 },
+  { month: _monthLabel(17), revenue: 35000000, orders: 890,  target: 33000000 },
+  { month: _monthLabel(16), revenue: 42000000, orders: 1050, target: 38000000 },
+  { month: _monthLabel(15), revenue: 51000000, orders: 1280, target: 45000000 },
+  // ── 12개월 전 ~ 1개월 전 ──
+  { month: _monthLabel(14), revenue: 29000000, orders: 735,  target: 32000000 },
+  { month: _monthLabel(13), revenue: 26000000, orders: 680,  target: 32000000 },
+  { month: _monthLabel(12), revenue: 37000000, orders: 940,  target: 35000000 },
+  { month: _monthLabel(11), revenue: 34000000, orders: 870,  target: 36000000 },
+  { month: _monthLabel(10), revenue: 39000000, orders: 990,  target: 38000000 },
+  { month: _monthLabel(9),  revenue: 43000000, orders: 1090, target: 40000000 },
+  { month: _monthLabel(8),  revenue: 38000000, orders: 970,  target: 40000000 },
+  { month: _monthLabel(7),  revenue: 44000000, orders: 1110, target: 42000000 },
+  { month: _monthLabel(6),  revenue: 41000000, orders: 1050, target: 42000000 },
+  { month: _monthLabel(5),  revenue: 47000000, orders: 1190, target: 44000000 },
+  { month: _monthLabel(4),  revenue: 55000000, orders: 1380, target: 48000000 },
+  { month: _monthLabel(3),  revenue: 63000000, orders: 1580, target: 55000000 },
+  // ── 최근 3개월 ──
+  { month: _monthLabel(2),  revenue: 32000000, orders: 856,  target: 35000000 },
+  { month: _monthLabel(1),  revenue: 28500000, orders: 742,  target: 35000000 },
+  { month: _monthLabel(0),  revenue: 48250000, orders: 1284, target: 45000000 },
 ];
 
 // ── 카테고리 도넛 차트 ────────────────────────────────────
@@ -203,7 +227,7 @@ export const MOCK_INVENTORY_ITEMS: InventoryItem[] = [
   },
 ];
 
-// ── 알림 (최근 10건, 2026-03-27 기준) ────────────────────
+// ── 알림 (최근 10건, 오늘 기준) ───────────────────────────
 export const MOCK_NOTIFICATIONS: Notification[] = [
   {
     id: 'notif-001',
@@ -211,7 +235,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     title: '결제 실패',
     message: '주문 SO-2026-001285 결제가 실패했습니다. 카드 한도 초과 — 고객 재결제 안내 필요.',
     isRead: false,
-    createdAt: '2026-03-27T09:45:00Z',
+    createdAt: _isoAt(0, 9, 45),
     href: '/dashboard/orders',
   },
   {
@@ -220,7 +244,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     title: '재고 부족 경고',
     message: 'MX Keys S 키보드 (흑색) 재고 3개 남음. 최소 안전 재고(20개) 이하로 즉시 입고 필요.',
     isRead: false,
-    createdAt: '2026-03-27T09:30:00Z',
+    createdAt: _isoAt(0, 9, 30),
     href: '/dashboard/inventory',
   },
   {
@@ -229,7 +253,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     title: '주문 취소',
     message: '강동원 님의 주문 SO-2026-001280이 취소 처리됐습니다. MX Keys S 키보드 1개.',
     isRead: false,
-    createdAt: '2026-03-27T08:50:00Z',
+    createdAt: _isoAt(0, 8, 50),
     href: '/dashboard/orders',
   },
   {
@@ -238,7 +262,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     title: '고객 문의',
     message: '박지영 님이 배송 지연 관련 문의를 접수했습니다. (주문 SO-2026-001283) 빠른 답변 요망.',
     isRead: false,
-    createdAt: '2026-03-27T08:20:00Z',
+    createdAt: _isoAt(0, 8, 20),
     href: '/dashboard/orders',
   },
   {
@@ -247,7 +271,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     title: '배송 지연',
     message: '주문 SO-2026-001282 배송이 물류 센터 혼잡으로 1일 지연 예정. 고객 사전 안내 권장.',
     isRead: false,
-    createdAt: '2026-03-27T07:10:00Z',
+    createdAt: _isoAt(0, 7, 10),
     href: '/dashboard/orders',
   },
   {
@@ -256,7 +280,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     title: '재고 부족 경고',
     message: 'Keychron Q1 Pro 재고 5개 남음. 최소 안전 재고(20개) 이하 — 발주 검토 필요.',
     isRead: false,
-    createdAt: '2026-03-26T22:00:00Z',
+    createdAt: _isoAt(1, 22, 0),
     href: '/dashboard/inventory',
   },
   {
@@ -265,7 +289,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     title: '반품 요청',
     message: '정수연 님이 MagSafe 충전 케이블 3개 반품을 요청했습니다. (주문 SO-2026-001281)',
     isRead: true,
-    createdAt: '2026-03-26T18:30:00Z',
+    createdAt: _isoAt(1, 18, 30),
     href: '/dashboard/orders',
   },
   {
@@ -274,7 +298,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     title: '결제 실패',
     message: '주문 SO-2026-001278 결제가 실패했습니다. 카드사 오류 — 고객 재결제 유도 필요.',
     isRead: true,
-    createdAt: '2026-03-26T15:00:00Z',
+    createdAt: _isoAt(1, 15, 0),
     href: '/dashboard/orders',
   },
   {
@@ -283,7 +307,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     title: '배송 지연 (다건)',
     message: '물류 센터 적재 지연으로 3건의 주문 배송이 1~2일 지연됩니다. 고객 안내 바랍니다.',
     isRead: true,
-    createdAt: '2026-03-26T10:00:00Z',
+    createdAt: _isoAt(1, 10, 0),
     href: '/dashboard/orders',
   },
   {
@@ -292,7 +316,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     title: '고객 문의',
     message: '한소희 님이 제품 교환 관련 문의를 접수했습니다. (주문 SO-2026-001279)',
     isRead: true,
-    createdAt: '2026-03-25T16:00:00Z',
+    createdAt: _isoAt(2, 16, 0),
     href: '/dashboard/orders',
   },
 ];
@@ -310,7 +334,7 @@ export const MOCK_ORDERS: Order[] = [
     totalAmount: 198000,
     paymentMethod: 'card',
     status: 'paid',
-    createdAt: '2026-03-26T09:12:00Z',
+    createdAt: _isoAt(1, 9, 12),
     shippingAddress: '서울시 강남구 테헤란로 123',
   },
   {
@@ -323,7 +347,7 @@ export const MOCK_ORDERS: Order[] = [
     totalAmount: 178000,
     paymentMethod: 'kakao_pay',
     status: 'shipped',
-    createdAt: '2026-03-25T15:30:00Z',
+    createdAt: _isoAt(2, 15, 30),
     shippingAddress: '경기도 성남시 분당구 판교로 456',
   },
   {
@@ -337,7 +361,7 @@ export const MOCK_ORDERS: Order[] = [
     totalAmount: 328000,
     paymentMethod: 'bank_transfer',
     status: 'preparing',
-    createdAt: '2026-03-25T11:00:00Z',
+    createdAt: _isoAt(2, 11, 0),
     shippingAddress: '부산시 해운대구 마린시티 789',
   },
   {
@@ -350,7 +374,7 @@ export const MOCK_ORDERS: Order[] = [
     totalAmount: 117000,
     paymentMethod: 'naver_pay',
     status: 'delivered',
-    createdAt: '2026-03-24T08:45:00Z',
+    createdAt: _isoAt(3, 8, 45),
   },
   {
     id: 'ord-005',
@@ -362,7 +386,7 @@ export const MOCK_ORDERS: Order[] = [
     totalAmount: 139000,
     paymentMethod: 'card',
     status: 'cancelled',
-    createdAt: '2026-03-24T07:20:00Z',
+    createdAt: _isoAt(3, 7, 20),
   },
   {
     id: 'ord-006',
@@ -375,6 +399,6 @@ export const MOCK_ORDERS: Order[] = [
     totalAmount: 157000,
     paymentMethod: 'card',
     status: 'pending',
-    createdAt: '2026-03-23T20:10:00Z',
+    createdAt: _isoAt(4, 20, 10),
   },
 ];

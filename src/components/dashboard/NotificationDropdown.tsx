@@ -63,11 +63,10 @@ const TYPE_CONFIG: Record<
 };
 
 /**
- * 상대 시간 포맷
- * mock 기준 시각: 2026-03-27T10:00:00Z
+ * 상대 시간 포맷 (실시간 기준)
  */
 const formatRelativeTime = (isoString: string): string => {
-  const now = new Date('2026-03-27T10:00:00Z');
+  const now = new Date();
   const then = new Date(isoString);
   const diffMs = now.getTime() - then.getTime();
   const diffMin = Math.floor(diffMs / 60000);
