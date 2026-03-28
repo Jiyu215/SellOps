@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import type { UserProfile, Notification } from '@/types/dashboard';
@@ -25,6 +26,7 @@ export const DashboardLayout = ({
   pageTitle = '대시보드',
   notifications: initialNotifications = [],
 }: DashboardLayoutProps) => {
+  const router = useRouter();
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
@@ -41,6 +43,12 @@ export const DashboardLayout = ({
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
   }, []);
 
+  /** 로그아웃: 쿠키 삭제 후 로그인 페이지로 이동 */
+  const handleLogout = useCallback(async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.push('/auth/login');
+  }, [router]);
+
   return (
     /* h-screen: 사이드바·헤더 고정, 메인 영역만 수직 스크롤 */
     <div className="h-screen bg-light-background dark:bg-dark-background flex overflow-hidden">
@@ -50,6 +58,7 @@ export const DashboardLayout = ({
         onMenuChange={setActiveMenu}
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
+        onLogout={handleLogout}
       />
 
       {/* 메인 영역 (헤더 고정 + 본문 스크롤) */}

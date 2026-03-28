@@ -20,6 +20,8 @@ interface SidebarProps {
   mobileOpen: boolean;
   /** 오버레이 클릭 또는 메뉴 선택 시 닫기 콜백 */
   onMobileClose: () => void;
+  /** 로그아웃 콜백 */
+  onLogout?: () => void;
 }
 
 interface NavItem {
@@ -55,6 +57,7 @@ export const Sidebar = ({
   onMenuChange,
   mobileOpen,
   onMobileClose,
+  onLogout,
 }: SidebarProps) => {
   const handleMenuClick = (key: string) => {
     onMenuChange?.(key);
@@ -197,6 +200,7 @@ export const Sidebar = ({
           <button
             type="button"
             title="로그아웃"
+            onClick={onLogout}
             className={[
               'w-full flex items-center gap-sm px-sm py-sm rounded-md',
               'text-bodySm font-medium text-light-error dark:text-dark-error',
