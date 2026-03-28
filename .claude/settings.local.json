@@ -7,7 +7,13 @@
       "Bash(npx tsc:*)",
       "Bash(npx eslint:*)",
       "Bash(npm run:*)",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(cmd /c \"gh auth status\")",
+      "Bash(cmd /c \"gh repo view\")",
+      "Read(//c/Users/USER/AppData/Local/Temp/claude/C--Users-USER-Desktop-sellops-sellops/7e85931a-24fc-4f85-98a3-afc482000cc7/tasks/**)",
+      "Bash(powershell -Command \"gh auth status\" 2>&1)",
+      "Bash(powershell -Command \"& ''C:\\\\Users\\\\USER\\\\AppData\\\\Local\\\\GitHubCLI\\\\bin\\\\gh.exe'' pr view 6 2>&1\")",
+      "Bash(powershell -Command \"Get-Command gh -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source\")"
     ]
   }
 }
