@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { getDashboardData } from '@/services/dashboardService';
-import { DashboardSkeleton } from '@/components/dashboard/skeletons/DashboardSkeleton';
+import {
+  DashboardSkeleton,
+  OrderTableSkeleton,
+} from '@/components/dashboard/skeletons/DashboardSkeleton';
 import { KPICardGrid } from '@/components/dashboard/kpi/KPICardGrid';
 import { SalesShortTermChart } from '@/components/dashboard/charts/SalesShortTermChart';
 import { SalesComboChart } from '@/components/dashboard/charts/SalesComboChart';
@@ -117,13 +120,20 @@ export const DashboardContent = () => {
       </div>
 
       {/* ── 5. 최근 주문 내역 ────────────────────────────────── */}
-      <ErrorBoundary
-        fallbackRender={(reset) => (
-          <TableErrorFallback title="최근 주문 내역" onReset={reset} />
-        )}
-      >
-        <OrderTable orders={data.orders} />
-      </ErrorBoundary>
+      {/*
+        useSearchParams()를 사용하는 OrderTable은 Suspense 바운더리 필수
+        (Next.js App Router 요구사항 — SSR 중 서스펜드 허용)
+        fallback: OrderTableSkeleton으로 레이아웃 시프트 방지
+      */}
+      <Suspense fallback={<OrderTableSkeleton />}>
+        <ErrorBoundary
+          fallbackRender={(reset) => (
+            <TableErrorFallback title="최근 주문 내역" onReset={reset} />
+          )}
+        >
+          <OrderTable orders={data.orders} />
+        </ErrorBoundary>
+      </Suspense>
 
     </div>
   );

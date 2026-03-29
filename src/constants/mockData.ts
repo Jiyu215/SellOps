@@ -401,4 +401,16 @@ export const MOCK_ORDERS: Order[] = [
     status: 'pending',
     createdAt: _isoAt(4, 20, 10),
   },
+  {
+    id: 'ord-007',
+    orderNumber: 'SO-2026-001280',
+    customer: { name: '한소희', email: 'sohee@example.com', phone: '010-4444-6666', tier: 'VIP' },
+    products: [
+      { name: 'MX Keys S 키보드', sku: 'KB-MXS-BLK', quantity: 1, unitPrice: 139000 },
+    ],
+    totalAmount: 139000,
+    paymentMethod: 'card',
+    status: 'cancelled',
+    createdAt: _isoAt(3, 7, 20),
+  },
 ];

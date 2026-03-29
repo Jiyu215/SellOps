@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import {
   SearchOutlined,
   FilterOutlined,
@@ -8,8 +8,9 @@ import {
   LeftOutlined,
   RightOutlined,
 } from '@ant-design/icons';
-import type { Order, OrderStatus, OrderFilter } from '@/types/dashboard';
+import type { Order, OrderStatus } from '@/types/dashboard';
 import { matchesKorean } from '@/utils/choseong';
+import { useOrderFilter } from '@/hooks/useOrderFilter';
 
 interface OrderTableProps {
   orders: Order[];
@@ -158,29 +159,120 @@ const CustomerAvatar = ({ name }: { name: string }) => {
  * - 모바일: 2열 그리드 카드형
  */
 export const OrderTable = ({ orders }: OrderTableProps) => {
-  const [filter, setFilter] = useState<OrderFilter>({
-    search: '',
-    status: 'all',
-    paymentMethod: 'all',
-  });
-  const [currentPage, setCurrentPage] = useState(1);
+  const { filter, currentPage, handleSearch, handleStatusChange, setCurrentPage } = useOrderFilter();
+
+  /**
+   * IME 조합 상태 관리
+   *
+   * 문제: 한글 입력 시 브라우저가 조합 중(e.g. ㅎ→하→한)에도 onChange를 발화해
+   *       부분 완성 문자열로 URL 쿼리가 매 키스트로크마다 갱신됨
+   *
+   * 해결 전략:
+   *   - inputValue: 입력창 표시용 로컬 상태 — 조합 중에도 즉시 반영 (UX 유지)
+   *   - isComposingRef: 조합 중 여부 플래그 (useRef — 리렌더 불필요)
+   *   - onChange 중 isComposing === true이면 handleSearch 호출 보류
+   *   - onCompositionEnd에서 조합 완료 값으로 handleSearch 호출
+   *
+   * Chrome 이벤트 순서: compositionEnd → onChange (동일 값으로 중복 발화)
+   * 중복 방지: lastTriggeredRef로 마지막으로 검색한 값 추적, 동일 값 재호출 차단
+   */
+  /**
+   * inputValue: 입력창 표시 전용 로컬 상태
+   *
+   * - URL(filter.search)이 아닌 로컬 state를 value로 사용해
+   *   React Concurrent Mode의 중간 render에서 입력값이 사라지는 문제를 방지
+   * - 페이지 최초 진입 시 URL 파라미터로 초기화 (북마크·링크 공유 지원)
+   * - 이후에는 사용자 이벤트(onChange / compositionEnd)만으로 업데이트
+   *   → URL 업데이트(router.replace)가 일으키는 re-render가 inputValue를 건드리지 않음
+   *
+   * 브라우저 뒤로가기/앞으로가기 시 filter.search가 바뀌어도 inputValue는 갱신되지 않음.
+   * 단, 테이블 필터링 자체는 URL 기반이므로 데이터는 올바르게 표시되며,
+   * 검색창 텍스트만 이전 값을 유지하는 미미한 UX 차이가 남는다.
+   */
+  const [inputValue, setInputValue] = useState(filter.search);
+  const isComposingRef     = useRef(false);
+  const lastTriggeredRef   = useRef(filter.search);
+  const debounceTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // 언마운트 시 펜딩 타이머·요청 정리
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current !== null) clearTimeout(debounceTimerRef.current);
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  /**
+   * 실제 검색 실행
+   * - 앞뒤 공백 제거 후 중복 방지
+   * - AbortController: 현재는 동기 클라이언트 필터링이라 취소 효과 없음.
+   *   실제 API 연동 시 handleSearch(trimmed, signal) 형태로 signal 전달해
+   *   이전 요청을 취소하고 최신 응답만 반영하는 구조로 확장 가능
+   */
+  const executeSearch = (value: string) => {
+    const normalized = value.replace(/\s+/g, '');
+    if (lastTriggeredRef.current === normalized) return;
+    lastTriggeredRef.current = normalized;
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
+    handleSearch(normalized);
+  };
+
+  /**
+   * 디바운스(300ms) 적용 — 일반 타이핑 전용
+   * 이전 타이머를 취소하고 새 타이머를 등록해 마지막 입력만 처리
+   */
+  const triggerSearchDebounced = (value: string) => {
+    if (debounceTimerRef.current !== null) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      debounceTimerRef.current = null;
+      executeSearch(value);
+    }, 300);
+  };
+
+  /**
+   * 즉시 실행 — compositionEnd 전용
+   * 사용자가 조합 완료 키를 누른 것은 명시적 확정 의사이므로 디바운스 없이 즉시 검색.
+   * 진행 중인 디바운스 타이머도 함께 취소해 중복 실행 방지
+   */
+  const triggerSearchImmediate = (value: string) => {
+    if (debounceTimerRef.current !== null) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    executeSearch(value);
+  };
+
+  const handleCompositionStart = () => {
+    isComposingRef.current = true;
+  };
+
+  const handleCompositionEnd = (e: React.CompositionEvent<HTMLInputElement>) => {
+    isComposingRef.current = false;
+    triggerSearchImmediate(e.currentTarget.value);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+    // 조합 중이 아닐 때만 검색 (조합 완료는 onCompositionEnd에서 처리)
+    if (!isComposingRef.current) {
+      triggerSearchDebounced(e.target.value);
+    }
+  };
 
   const filteredOrders = useMemo(() => {
     const q = filter.search.trim().toLowerCase();
     return orders.filter((order) => {
       const matchesSearch =
         !q ||
-        // 주문번호 검색
         order.orderNumber.toLowerCase().includes(q) ||
-        // 고객명 검색 (초성 검색 포함)
         matchesKorean(order.customer.name, filter.search) ||
-        // 이메일 검색
         order.customer.email.toLowerCase().includes(q);
 
       const matchesStatus = filter.status === 'all' || order.status === filter.status;
-      const matchesPayment = filter.paymentMethod === 'all' || order.paymentMethod === filter.paymentMethod;
 
-      return matchesSearch && matchesStatus && matchesPayment;
+      return matchesSearch && matchesStatus;
     });
   }, [orders, filter]);
 
@@ -189,17 +281,6 @@ export const OrderTable = ({ orders }: OrderTableProps) => {
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
   );
-
-  // 필터 변경 시 첫 페이지로 복귀 (핸들러에서 직접 처리)
-  const handleSearch = (value: string) => {
-    setFilter((f) => ({ ...f, search: value }));
-    setCurrentPage(1);
-  };
-
-  const handleStatusChange = (value: string) => {
-    setFilter((f) => ({ ...f, status: value as OrderFilter['status'] }));
-    setCurrentPage(1);
-  };
 
   return (
     <section className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-md p-md">
@@ -239,8 +320,10 @@ export const OrderTable = ({ orders }: OrderTableProps) => {
           <input
             type="search"
             placeholder="주문번호, 고객명(초성 가능), 이메일 검색..."
-            value={filter.search}
-            onChange={(e) => handleSearch(e.target.value)}
+            value={inputValue}
+            onChange={handleInputChange}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
             className="flex-1 bg-transparent text-bodySm text-light-textPrimary dark:text-dark-textPrimary placeholder:text-light-textSecondary dark:placeholder:text-dark-textSecondary outline-none"
             aria-label="주문 검색"
           />
