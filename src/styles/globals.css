@@ -1,106 +1,34 @@
-@import url('//fonts.googleapis.com/earlyaccess/notosanskr.css');
+/* Tailwind CSS v4 진입점 */
+@import "tailwindcss";
 
-/* Pretendard 웹폰트 로드 */
+/*
+ * tailwind.config.js 로드 (v4 @config 지시어)
+ * - colors, spacing, fontSize, borderRadius, boxShadow, fontFamily, darkMode 모두 여기서 적용
+ * - 경로: globals.css(src/styles/) → 루트(tailwind.config.js) = ../../
+ */
+@config "../../tailwind.config.js";
+
+/* ── 다크모드 클래스 기반 변형 ─────────────────────────────────
+   useThemeToggle 훅이 <html>에 .dark 클래스를 붙이는 방식에 맞춤
+   @config의 darkMode: 'class' 설정을 v4 방식으로 보강 */
+@variant dark (&:where(.dark, .dark *));
+
+/* ── Pretendard 웹폰트 ──────────────────────────────────────── */
 @font-face {
-    font-family: 'Pretendard';
-    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Regular.woff2') format('woff2');
-    font-weight: 400;
-    font-display: swap;
+  font-family: 'Pretendard';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
 }
 
 @font-face {
-    font-family: 'Pretendard';
-    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Bold.woff2') format('woff2');
-    font-weight: 700;
-    font-display: swap;
+  font-family: 'Pretendard';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
 }
 
-/* Reset */
-*, *::before, *::after {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-/* Body 기본 스타일 */
+/* ── 전역 기본 스타일 ───────────────────────────────────────── */
 body {
-    font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
-    font-size: 16px;
-    line-height: 1.5;
-    color: var(--text-color);
-    background-color: var(--bg-color);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-}
-
-/* 링크 스타일 */
-a {
-    color: inherit;
-    text-decoration: none;
-}
-
-/* 이미지 */
-img {
-    max-width: 100%;
-    height: auto;
-    display: block;
-}
-
-/* CSS 변수로 라이트/다크 모드 정의 */
-:root {
-  --text-color: #222222;
-  --text-secondary: #666666;
-  --bg-color: #F9F9FF;
-  --surface: #FFFFFF;
-  --border-color: #E0E0E0;
-  --primary: #5D5FEF;
-  --primary-light: #787CFF;
-  --primary-dark: #4A4DD1;
-  --primary-bg: #F0F1FF;
-  --secondary: #EDF0FF;
-  --success: #28A745;
-  --error: #DC3545;
-  --warning: #FFC107;
-  --info: #17A2B8;
-}
-
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text-color: #E0E0E0;
-    --text-secondary: #AAAAAA;
-    --bg-color: #121212;
-    --surface: #1E1E1E;
-    --border-color: #2C2C2C;
-    --primary: #5D5FEF;
-    --primary-light: #6568E5;
-    --primary-dark: #4A4DD1;
-    --primary-bg: #1B1F2A;
-    --secondary: #1B1F2A;
-    --success: #28A745;
-    --error: #DC3545;
-    --warning: #FFC107;
-    --info: #17A2B8;
-  }
-}
-
-/* Headings 기본 스타일 */
-h1, h2, h3, h4, h5, h6 {
-    font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
-    font-weight: 700;
-    line-height: 1.2;
-    letter-spacing: -0.5px;
-}
-
-/* P, span 등 본문 */
-p, span {
-    font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
-    font-weight: 400;
-    line-height: 1.5;
-    letter-spacing: 0px;
-}
-
-/* list 기본 스타일 */
-ul, ol {
-    list-style: none;
+  font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
 }

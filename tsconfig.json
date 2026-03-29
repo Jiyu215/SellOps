@@ -16,7 +16,7 @@
     "baseUrl": ".",
     "plugins": [{"name": "next"}],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": [
