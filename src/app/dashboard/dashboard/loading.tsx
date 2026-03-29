@@ -1,5 +1,4 @@
-import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
-import { DashboardSkeleton } from '@/components/dashboard/skeletons/DashboardSkeleton';
+import { DashboardLayout, DashboardSkeleton } from '@/components/dashboard';
 import { MOCK_USER, MOCK_NOTIFICATIONS } from '@/constants/mockData';
 
 /**

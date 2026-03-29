@@ -1,0 +1,1 @@
+export { TopProductsCard } from './TopProductsCard';

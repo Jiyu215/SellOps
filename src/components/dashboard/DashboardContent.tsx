@@ -2,17 +2,12 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { getDashboardData } from '@/services/dashboardService';
-import {
-  DashboardSkeleton,
-  OrderTableSkeleton,
-} from '@/components/dashboard/skeletons/DashboardSkeleton';
-import { KPICardGrid } from '@/components/dashboard/kpi/KPICardGrid';
-import { SalesShortTermChart } from '@/components/dashboard/charts/SalesShortTermChart';
-import { SalesComboChart } from '@/components/dashboard/charts/SalesComboChart';
-import { CategoryDoughnutChart } from '@/components/dashboard/charts/CategoryDoughnutChart';
-import { LowStockTable } from '@/components/dashboard/inventory/LowStockTable';
-import { OrderTable } from '@/components/dashboard/orders/OrderTable';
-import { TopProductsCard } from '@/components/dashboard/products/TopProductsCard';
+import { DashboardSkeleton, OrderTableSkeleton } from '@/components/dashboard/skeletons';
+import { KPICardGrid } from '@/components/dashboard/kpi';
+import { SalesShortTermChart, SalesComboChart, CategoryDoughnutChart } from '@/components/dashboard/charts';
+import { LowStockTable } from '@/components/dashboard/inventory';
+import { OrderTable } from '@/components/dashboard/orders';
+import { TopProductsCard } from '@/components/dashboard/products';
 import {
   ErrorBoundary,
   ChartErrorFallback,
