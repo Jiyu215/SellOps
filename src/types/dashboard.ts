@@ -149,3 +149,14 @@ export interface DashboardPageProps {
   orders: Order[];
   currentUser: UserProfile;
 }
+
+// ── 대시보드 데이터 묶음 (서비스 레이어 반환 타입) ──────────
+export interface DashboardData {
+  kpiData: KPICardData[];
+  dailyData: DailyDataPoint[];
+  salesData: SalesDataPoint[];
+  categoryData: CategoryDataPoint[];
+  inventoryItems: InventoryItem[];
+  orders: Order[];
+  topProducts: Record<TopProductPeriod, TopProductItem[]>;
+}
