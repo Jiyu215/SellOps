@@ -12,6 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import type { MouseHandlerDataParam } from 'recharts';
 import type { SalesDataPoint } from '@/types/dashboard';
 import type {
   ChartPeriod,
@@ -147,8 +148,8 @@ export const SalesComboChart = ({ data }: SalesComboChartProps) => {
   );
 
   /** 차트 영역 클릭 → 월별 상세 패널 토글 */
-  const handleChartClick = (state: { activeTooltipIndex?: number }) => {
-    const chartIndex = state?.activeTooltipIndex;
+  const handleChartClick = (state: MouseHandlerDataParam) => {
+    const chartIndex = state.activeTooltipIndex;
     if (typeof chartIndex !== 'number') return;
     const fullIndex = enrichedAll.length - period + chartIndex;
     setSelectedDetail((prev) =>
@@ -237,7 +238,7 @@ export const SalesComboChart = ({ data }: SalesComboChartProps) => {
           <ComposedChart
             data={chartData}
             margin={{ top: 16, right: 16, left: 0, bottom: 0 }}
-            onClick={handleChartClick as (state: object) => void}
+            onClick={handleChartClick}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
             <XAxis

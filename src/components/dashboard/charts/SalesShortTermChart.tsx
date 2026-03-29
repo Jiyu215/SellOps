@@ -10,6 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import type { DotItemDotProps } from 'recharts';
 import type { DailyDataPoint } from '@/types/dashboard';
 import type { EnrichedDailyPoint, ChartTooltipProps } from '@/types/charts';
 import {
@@ -108,14 +109,13 @@ const ShortTermTooltip = ({ active, payload, label }: ChartTooltipProps<Enriched
 /**
  * enriched 배열을 클로저로 캡처하는 named dot 렌더러 생성.
  * named function expression을 반환하여 react/display-name ESLint 규칙 준수.
+ * DotItemDotProps: Recharts가 dot 렌더 함수에 전달하는 공식 타입 (cx, cy: number | undefined, index: number)
  */
 const buildRevenueDotRenderer = (
   enriched: EnrichedDailyPoint[],
-): ((props: object) => React.ReactElement) => {
-  function RevenueDot(props: Record<string, unknown>): React.ReactElement {
-    const cx = props.cx as number;
-    const cy = props.cy as number;
-    const index = props.index as number;
+): ((props: DotItemDotProps) => React.ReactElement) => {
+  function RevenueDot({ cx, cy, index }: DotItemDotProps): React.ReactElement {
+    if (cx == null || cy == null) return <g />;
     const point = enriched[index];
     if (!point) return <g />;
 
@@ -146,7 +146,7 @@ const buildRevenueDotRenderer = (
       />
     );
   }
-  return RevenueDot as (props: object) => React.ReactElement;
+  return RevenueDot;
 };
 
 /**
