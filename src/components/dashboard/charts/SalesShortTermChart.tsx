@@ -12,6 +12,15 @@ import {
 } from 'recharts';
 import type { DailyDataPoint } from '@/types/dashboard';
 import type { EnrichedDailyPoint, ChartTooltipProps } from '@/types/charts';
+import {
+  CHART_ANOMALY_THRESHOLD,
+  COLOR_PRIMARY,
+  COLOR_SUCCESS,
+  COLOR_INFO,
+  COLOR_WARNING,
+  COLOR_ERROR,
+  COLOR_TEXT_SECONDARY_HEX,
+} from '@/constants/config';
 
 interface SalesShortTermChartProps {
   data: DailyDataPoint[];
@@ -20,9 +29,6 @@ interface SalesShortTermChartProps {
 /** 전일 대비 증감률 (소수점 1자리) */
 const calcChange = (current: number, prev: number) =>
   Math.round(((current - prev) / prev) * 1000) / 10;
-
-/** ±20% 초과 시 이상치 */
-const ANOMALY_THRESHOLD = 20;
 
 /** 금액 포맷 (만원) */
 const formatRevenue = (value: number) => `₩${(value / 10000).toFixed(0)}만`;
@@ -47,7 +53,7 @@ const ShortTermTooltip = ({ active, payload, label }: ChartTooltipProps<Enriched
 
       {/* 매출 */}
       <div className="space-y-xs mb-xs">
-        <p className="text-caption font-medium" style={{ color: '#5D5FEF' }}>
+        <p className="text-caption font-medium" style={{ color: COLOR_PRIMARY }}>
           매출: {formatRevenue(point.revenue)}
         </p>
         {point.changeRevenue !== null && (
@@ -59,7 +65,7 @@ const ShortTermTooltip = ({ active, payload, label }: ChartTooltipProps<Enriched
             }`}
           >
             전일 대비 {point.changeRevenue >= 0 ? '+' : ''}{point.changeRevenue}%
-            {Math.abs(point.changeRevenue) >= ANOMALY_THRESHOLD && (
+            {Math.abs(point.changeRevenue) >= CHART_ANOMALY_THRESHOLD && (
               <span className="ml-xs">
                 {point.changeRevenue >= 0 ? '▲ GROWTH' : '▼ DROP'}
               </span>
@@ -72,7 +78,7 @@ const ShortTermTooltip = ({ active, payload, label }: ChartTooltipProps<Enriched
 
       {/* 주문 수 */}
       <div className="space-y-xs mb-xs">
-        <p className="text-caption font-medium" style={{ color: '#17A2B8' }}>
+        <p className="text-caption font-medium" style={{ color: COLOR_INFO }}>
           주문 수: {point.orders.toLocaleString()}건
         </p>
         {point.changeOrders !== null && (
@@ -91,7 +97,7 @@ const ShortTermTooltip = ({ active, payload, label }: ChartTooltipProps<Enriched
       <div className="border-t border-light-border dark:border-dark-border my-xs" />
 
       {/* 재고 위험 */}
-      <p className="text-caption font-medium" style={{ color: '#FFC107' }}>
+      <p className="text-caption font-medium" style={{ color: COLOR_WARNING }}>
         재고 위험: {point.stockRiskCount}품목
       </p>
     </div>
@@ -113,8 +119,8 @@ const buildRevenueDotRenderer = (
     const point = enriched[index];
     if (!point) return <g />;
 
-    if (point.changeRevenue !== null && Math.abs(point.changeRevenue) >= ANOMALY_THRESHOLD) {
-      const color = point.changeRevenue >= 0 ? '#28A745' : '#DC3545';
+    if (point.changeRevenue !== null && Math.abs(point.changeRevenue) >= CHART_ANOMALY_THRESHOLD) {
+      const color = point.changeRevenue >= 0 ? COLOR_SUCCESS : COLOR_ERROR;
       return (
         <g key={`dot-${index}`}>
           {/* 외곽 반투명 원 — 이상치 시각 강조 */}
@@ -128,7 +134,7 @@ const buildRevenueDotRenderer = (
         <circle
           key={`dot-${index}`}
           cx={cx} cy={cy} r={5}
-          fill="#5D5FEF" stroke="white" strokeWidth={2}
+          fill={COLOR_PRIMARY} stroke="white" strokeWidth={2}
         />
       );
     }
@@ -136,7 +142,7 @@ const buildRevenueDotRenderer = (
       <circle
         key={`dot-${index}`}
         cx={cx} cy={cy} r={3}
-        fill="#5D5FEF" stroke="white" strokeWidth={1}
+        fill={COLOR_PRIMARY} stroke="white" strokeWidth={1}
       />
     );
   }
@@ -213,7 +219,7 @@ export const SalesShortTermChart = ({ data }: SalesShortTermChartProps) => {
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 12, fill: '#666666' }}
+              tick={{ fontSize: 12, fill: COLOR_TEXT_SECONDARY_HEX }}
               axisLine={false}
               tickLine={false}
             />
@@ -222,7 +228,7 @@ export const SalesShortTermChart = ({ data }: SalesShortTermChartProps) => {
               yAxisId="revenue"
               orientation="left"
               tickFormatter={formatRevenue}
-              tick={{ fontSize: 11, fill: '#666666' }}
+              tick={{ fontSize: 11, fill: COLOR_TEXT_SECONDARY_HEX }}
               axisLine={false}
               tickLine={false}
               width={68}
@@ -231,7 +237,7 @@ export const SalesShortTermChart = ({ data }: SalesShortTermChartProps) => {
             <YAxis
               yAxisId="orders"
               orientation="right"
-              tick={{ fontSize: 11, fill: '#666666' }}
+              tick={{ fontSize: 11, fill: COLOR_TEXT_SECONDARY_HEX }}
               axisLine={false}
               tickLine={false}
               width={40}
@@ -250,10 +256,10 @@ export const SalesShortTermChart = ({ data }: SalesShortTermChartProps) => {
               type="monotone"
               dataKey="revenue"
               name="매출"
-              stroke="#5D5FEF"
+              stroke={COLOR_PRIMARY}
               strokeWidth={2.5}
               dot={revenueDotRenderer}
-              activeDot={{ r: 6, fill: '#5D5FEF', stroke: 'white', strokeWidth: 2 }}
+              activeDot={{ r: 6, fill: COLOR_PRIMARY, stroke: 'white', strokeWidth: 2 }}
             />
 
             {/* 주문 수 선 */}
@@ -262,9 +268,9 @@ export const SalesShortTermChart = ({ data }: SalesShortTermChartProps) => {
               type="monotone"
               dataKey="orders"
               name="주문 수"
-              stroke="#17A2B8"
+              stroke={COLOR_INFO}
               strokeWidth={2}
-              dot={{ r: 3, fill: '#17A2B8', stroke: 'white', strokeWidth: 1 }}
+              dot={{ r: 3, fill: COLOR_INFO, stroke: 'white', strokeWidth: 1 }}
               activeDot={{ r: 5 }}
             />
 
@@ -274,10 +280,10 @@ export const SalesShortTermChart = ({ data }: SalesShortTermChartProps) => {
               type="monotone"
               dataKey="stockRiskCount"
               name="재고 위험"
-              stroke="#FFC107"
+              stroke={COLOR_WARNING}
               strokeWidth={1.5}
               strokeDasharray="4 3"
-              dot={{ r: 3, fill: '#FFC107', stroke: 'white', strokeWidth: 1 }}
+              dot={{ r: 3, fill: COLOR_WARNING, stroke: 'white', strokeWidth: 1 }}
               activeDot={{ r: 5 }}
             />
           </LineChart>

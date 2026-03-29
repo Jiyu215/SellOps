@@ -10,6 +10,7 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import type { KPICardData, KPIStatus } from '@/types/dashboard';
+import { PROGRESS_ANIMATION_DELAY_MS, KPI_PROGRESS_TRANSITION } from '@/constants/config';
 
 interface KPICardProps {
   data: KPICardData;
@@ -68,7 +69,7 @@ export const KPICard = ({ data }: KPICardProps) => {
   // 프로그레스바 로드 애니메이션: 마운트 후 목표값으로 트랜지션
   const [progressWidth, setProgressWidth] = useState(0);
   useEffect(() => {
-    const timer = setTimeout(() => setProgressWidth(clampedProgress), 120);
+    const timer = setTimeout(() => setProgressWidth(clampedProgress), PROGRESS_ANIMATION_DELAY_MS);
     return () => clearTimeout(timer);
   }, [clampedProgress]);
 
@@ -146,7 +147,7 @@ export const KPICard = ({ data }: KPICardProps) => {
               className={`h-full rounded-full ${style.progressBar}`}
               style={{
                 width: `${progressWidth}%`,
-                transition: 'width 0.9s ease-out',
+                transition: KPI_PROGRESS_TRANSITION,
               }}
             />
           </div>

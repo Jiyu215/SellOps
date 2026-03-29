@@ -5,6 +5,7 @@ import {
   RightOutlined,
 } from '@ant-design/icons';
 import type { InventoryItem, RiskLevel } from '@/types/dashboard';
+import { CATEGORY_COLORS, COLOR_TEXT_SECONDARY_HEX } from '@/constants/config';
 
 interface LowStockTableProps {
   items: InventoryItem[];
@@ -45,17 +46,9 @@ const RISK_CONFIG: Record<RiskLevel, {
   },
 };
 
-// 카테고리별 썸네일 색상
-const CATEGORY_COLORS: Record<string, string> = {
-  '키보드': '#5D5FEF',
-  '마우스': '#28A745',
-  '허브/케이블': '#FFC107',
-  '모니터 암': '#17A2B8',
-};
-
 /** 카테고리 썸네일 아이콘 영역 */
 const CategoryThumbnail = ({ category }: { category: string }) => {
-  const color = CATEGORY_COLORS[category] ?? '#666666';
+  const color = CATEGORY_COLORS[category] ?? COLOR_TEXT_SECONDARY_HEX;
   return (
     <div
       className="w-12 h-12 rounded-md flex items-center justify-center flex-shrink-0 text-h5 font-bold"

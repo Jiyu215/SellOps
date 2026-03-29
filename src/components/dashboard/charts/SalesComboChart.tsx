@@ -19,6 +19,13 @@ import type {
   SelectedMonthDetail,
   ChartTooltipProps,
 } from '@/types/charts';
+import {
+  CHART_PERIOD_OPTIONS,
+  COLOR_PRIMARY,
+  COLOR_SUCCESS,
+  COLOR_WARNING,
+  COLOR_TEXT_SECONDARY_HEX,
+} from '@/constants/config';
 
 interface SalesComboChartProps {
   /** 전체 24개월 데이터 — 기간 슬라이싱은 컴포넌트 내부에서 처리 */
@@ -44,7 +51,7 @@ const LongTermTooltip = ({ active, payload, label }: ChartTooltipProps<EnrichedS
       <p className="font-semibold text-light-textPrimary dark:text-dark-textPrimary mb-xs">{label}</p>
 
       {/* 매출 + 목표 달성률 */}
-      <p className="text-caption font-medium" style={{ color: '#5D5FEF' }}>
+      <p className="text-caption font-medium" style={{ color: COLOR_PRIMARY }}>
         매출: {formatRevenue(point.revenue)}
       </p>
       <p className="text-caption text-light-textSecondary dark:text-dark-textSecondary">
@@ -87,7 +94,7 @@ const LongTermTooltip = ({ active, payload, label }: ChartTooltipProps<EnrichedS
       <div className="my-xs border-t border-light-border dark:border-dark-border" />
 
       {/* 주문 수 */}
-      <p className="text-caption font-medium" style={{ color: '#28A745' }}>
+      <p className="text-caption font-medium" style={{ color: COLOR_SUCCESS }}>
         주문 수: {point.orders.toLocaleString()}건
       </p>
 
@@ -187,7 +194,7 @@ export const SalesComboChart = ({ data }: SalesComboChartProps) => {
 
           {/* 기간 필터 */}
           <div className="flex gap-xs">
-            {([6, 12] as ChartPeriod[]).map((p) => (
+            {CHART_PERIOD_OPTIONS.map((p) => (
               <button
                 key={p}
                 type="button"
@@ -213,7 +220,7 @@ export const SalesComboChart = ({ data }: SalesComboChartProps) => {
           실제 매출
         </span>
         <span className="flex items-center gap-xs text-caption text-light-textSecondary dark:text-dark-textSecondary">
-          <span className="inline-block w-6 h-px bg-[#FFC107] flex-shrink-0" aria-hidden="true" style={{ borderTop: '2px dashed #FFC107', height: 0 }} />
+          <span className="inline-block w-6 h-px bg-[#FFC107] flex-shrink-0" aria-hidden="true" style={{ borderTop: `2px dashed ${COLOR_WARNING}`, height: 0 }} />
           목표 매출
         </span>
         <span className="flex items-center gap-xs text-caption text-light-textSecondary dark:text-dark-textSecondary">
@@ -235,7 +242,7 @@ export const SalesComboChart = ({ data }: SalesComboChartProps) => {
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
             <XAxis
               dataKey="month"
-              tick={{ fontSize: 12, fill: '#666666' }}
+              tick={{ fontSize: 12, fill: COLOR_TEXT_SECONDARY_HEX }}
               axisLine={false}
               tickLine={false}
             />
@@ -243,7 +250,7 @@ export const SalesComboChart = ({ data }: SalesComboChartProps) => {
               yAxisId="revenue"
               orientation="left"
               tickFormatter={formatRevenue}
-              tick={{ fontSize: 12, fill: '#666666' }}
+              tick={{ fontSize: 12, fill: COLOR_TEXT_SECONDARY_HEX }}
               axisLine={false}
               tickLine={false}
               width={72}
@@ -251,7 +258,7 @@ export const SalesComboChart = ({ data }: SalesComboChartProps) => {
             <YAxis
               yAxisId="orders"
               orientation="right"
-              tick={{ fontSize: 12, fill: '#666666' }}
+              tick={{ fontSize: 12, fill: COLOR_TEXT_SECONDARY_HEX }}
               axisLine={false}
               tickLine={false}
               width={48}
@@ -263,7 +270,7 @@ export const SalesComboChart = ({ data }: SalesComboChartProps) => {
               yAxisId="orders"
               dataKey="orders"
               name="주문 수"
-              fill="#28A745"
+              fill={COLOR_SUCCESS}
               radius={[3, 3, 0, 0]}
               opacity={0.55}
             />
@@ -274,7 +281,7 @@ export const SalesComboChart = ({ data }: SalesComboChartProps) => {
               type="monotone"
               dataKey="target"
               name="목표 매출"
-              stroke="#FFC107"
+              stroke={COLOR_WARNING}
               strokeWidth={2}
               strokeDasharray="6 3"
               dot={false}
@@ -286,10 +293,10 @@ export const SalesComboChart = ({ data }: SalesComboChartProps) => {
               type="monotone"
               dataKey="revenue"
               name="실제 매출"
-              stroke="#5D5FEF"
+              stroke={COLOR_PRIMARY}
               strokeWidth={2.5}
-              dot={{ r: 4, fill: '#5D5FEF', stroke: 'white', strokeWidth: 2 }}
-              activeDot={{ r: 6, fill: '#5D5FEF', stroke: 'white', strokeWidth: 2 }}
+              dot={{ r: 4, fill: COLOR_PRIMARY, stroke: 'white', strokeWidth: 2 }}
+              activeDot={{ r: 6, fill: COLOR_PRIMARY, stroke: 'white', strokeWidth: 2 }}
             />
           </ComposedChart>
         </ResponsiveContainer>

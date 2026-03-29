@@ -9,6 +9,12 @@ import {
   RightOutlined,
 } from '@ant-design/icons';
 import type { TopProductItem, TopProductPeriod } from '@/types/dashboard';
+import {
+  PROGRESS_ANIMATION_DELAY_MS,
+  BAR_PROGRESS_TRANSITION,
+  CATEGORY_COLORS,
+  COLOR_TEXT_SECONDARY_HEX,
+} from '@/constants/config';
 
 interface TopProductsCardProps {
   data: Record<TopProductPeriod, TopProductItem[]>;
@@ -44,14 +50,6 @@ const getBarColor = (rank: number): string => {
   }
 };
 
-/** 카테고리별 컬러 점 */
-const CATEGORY_COLORS: Record<string, string> = {
-  '키보드':    '#5D5FEF',
-  '마우스':    '#28A745',
-  '허브/케이블': '#FFC107',
-  '모니터 암':  '#17A2B8',
-};
-
 /** 금액 포맷: 만원 단위 */
 const formatRevenue = (value: number): string => {
   if (value >= 10000000) return `₩${(value / 10000000).toFixed(1)}천만`;
@@ -85,7 +83,7 @@ export const TopProductsCard = ({ data }: TopProductsCardProps) => {
   useEffect(() => {
     const t = setTimeout(() => {
       setBarWidths(products.map((p) => Math.round((p.revenue / topRevenue) * 100)));
-    }, 120);
+    }, PROGRESS_ANIMATION_DELAY_MS);
     return () => clearTimeout(t);
   }, [products, topRevenue]);
 
@@ -187,7 +185,7 @@ export const TopProductsCard = ({ data }: TopProductsCardProps) => {
                 <span className="flex items-center gap-xs text-caption text-light-textSecondary dark:text-dark-textSecondary min-w-0">
                   <span
                     className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: CATEGORY_COLORS[product.category] ?? '#666666' }}
+                    style={{ backgroundColor: CATEGORY_COLORS[product.category] ?? COLOR_TEXT_SECONDARY_HEX }}
                     aria-hidden="true"
                   />
                   <span className="truncate">{product.category}</span>
@@ -230,7 +228,7 @@ export const TopProductsCard = ({ data }: TopProductsCardProps) => {
                   className={`h-full rounded-full ${getBarColor(product.rank)}`}
                   style={{
                     width: `${barWidths[idx] ?? 0}%`,
-                    transition: 'width 0.8s ease-out',
+                    transition: BAR_PROGRESS_TRANSITION,
                   }}
                 />
               </div>

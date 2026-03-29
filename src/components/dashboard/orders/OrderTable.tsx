@@ -11,6 +11,16 @@ import {
 import type { Order, OrderStatus } from '@/types/dashboard';
 import { matchesKorean } from '@/utils/choseong';
 import { useOrderFilter } from '@/hooks/useOrderFilter';
+import {
+  ORDER_PAGE_SIZE,
+  SEARCH_DEBOUNCE_DELAY_MS,
+  COLOR_PRIMARY,
+  COLOR_SUCCESS,
+  COLOR_INFO,
+  COLOR_WARNING,
+  COLOR_ERROR,
+  COLOR_PURPLE,
+} from '@/constants/config';
 
 interface OrderTableProps {
   orders: Order[];
@@ -97,8 +107,6 @@ const STATUS_OPTIONS: Array<{ value: OrderStatus | 'all'; label: string }> = [
   { value: 'refunded', label: '환불됨' },
 ];
 
-const PAGE_SIZE = 5;
-
 /** 날짜 포맷 */
 const formatDate = (iso: string) => {
   const d = new Date(iso);
@@ -132,12 +140,15 @@ const exportToCSV = (orders: Order[]) => {
   URL.revokeObjectURL(url);
 };
 
+/** 고객 아바타 이니셜 원형 배경색 팔레트 */
+const AVATAR_COLORS = [
+  COLOR_PRIMARY, COLOR_SUCCESS, COLOR_INFO, COLOR_WARNING, COLOR_ERROR, COLOR_PURPLE,
+] as const;
+
 /** 고객 아바타 (이니셜 원형) */
 const CustomerAvatar = ({ name }: { name: string }) => {
   const initial = name.charAt(0);
-  // 이름 기반 색상 (고정)
-  const colors = ['#5D5FEF', '#28A745', '#17A2B8', '#FFC107', '#DC3545', '#6f42c1'];
-  const color = colors[name.charCodeAt(0) % colors.length];
+  const color = AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
   return (
     <div
       className="w-8 h-8 rounded-full flex items-center justify-center text-white text-caption font-bold flex-shrink-0"
@@ -228,7 +239,7 @@ export const OrderTable = ({ orders }: OrderTableProps) => {
     debounceTimerRef.current = setTimeout(() => {
       debounceTimerRef.current = null;
       executeSearch(value);
-    }, 300);
+    }, SEARCH_DEBOUNCE_DELAY_MS);
   };
 
   /**
@@ -276,10 +287,10 @@ export const OrderTable = ({ orders }: OrderTableProps) => {
     });
   }, [orders, filter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ORDER_PAGE_SIZE));
   const paginatedOrders = filteredOrders.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
+    (currentPage - 1) * ORDER_PAGE_SIZE,
+    currentPage * ORDER_PAGE_SIZE,
   );
 
   return (
