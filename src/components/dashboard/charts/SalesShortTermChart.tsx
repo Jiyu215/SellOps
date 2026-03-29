@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import type { DailyDataPoint } from '@/types/dashboard';
+import type { EnrichedDailyPoint, ChartTooltipProps } from '@/types/charts';
 
 interface SalesShortTermChartProps {
   data: DailyDataPoint[];
@@ -23,30 +24,12 @@ const calcChange = (current: number, prev: number) =>
 /** ±20% 초과 시 이상치 */
 const ANOMALY_THRESHOLD = 20;
 
-type EnrichedPoint = DailyDataPoint & {
-  changeRevenue: number | null;
-  changeOrders: number | null;
-  isToday: boolean; // 마지막 데이터 포인트 (= KPI 카드 값)
-};
-
 /** 금액 포맷 (만원) */
 const formatRevenue = (value: number) => `₩${(value / 10000).toFixed(0)}만`;
 
 // ── 커스텀 툴팁 ──────────────────────────────────────────
-interface TooltipEntry {
-  name: string;
-  value: number;
-  color: string;
-  payload: EnrichedPoint;
-}
 
-interface ShortTermTooltipProps {
-  active?: boolean;
-  payload?: TooltipEntry[];
-  label?: string;
-}
-
-const ShortTermTooltip = ({ active, payload, label }: ShortTermTooltipProps) => {
+const ShortTermTooltip = ({ active, payload, label }: ChartTooltipProps<EnrichedDailyPoint>) => {
   if (!active || !payload?.length) return null;
   const point = payload[0].payload;
 
@@ -121,7 +104,7 @@ const ShortTermTooltip = ({ active, payload, label }: ShortTermTooltipProps) => 
  * named function expression을 반환하여 react/display-name ESLint 규칙 준수.
  */
 const buildRevenueDotRenderer = (
-  enriched: EnrichedPoint[],
+  enriched: EnrichedDailyPoint[],
 ): ((props: object) => React.ReactElement) => {
   function RevenueDot(props: Record<string, unknown>): React.ReactElement {
     const cx = props.cx as number;
@@ -170,7 +153,7 @@ const buildRevenueDotRenderer = (
  * - 마지막 점(오늘) = KPI 카드 값과 연동
  */
 export const SalesShortTermChart = ({ data }: SalesShortTermChartProps) => {
-  const enriched = useMemo<EnrichedPoint[]>(
+  const enriched = useMemo<EnrichedDailyPoint[]>(
     () =>
       data.map((d, i, arr) => ({
         ...d,

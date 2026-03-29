@@ -13,13 +13,17 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import type { SalesDataPoint } from '@/types/dashboard';
+import type {
+  ChartPeriod,
+  EnrichedSalesPoint,
+  SelectedMonthDetail,
+  ChartTooltipProps,
+} from '@/types/charts';
 
 interface SalesComboChartProps {
   /** 전체 24개월 데이터 — 기간 슬라이싱은 컴포넌트 내부에서 처리 */
   data: SalesDataPoint[];
 }
-
-type Period = 6 | 12;
 
 /** 금액 포맷 (만원 단위) */
 const formatRevenue = (value: number) => `₩${(value / 10000).toFixed(0)}만`;
@@ -28,33 +32,9 @@ const formatRevenue = (value: number) => `₩${(value / 10000).toFixed(0)}만`;
 const calcChange = (current: number, prev: number) =>
   Math.round(((current - prev) / prev) * 1000) / 10;
 
-// ── 확장 타입 (전월/전년 변화율 포함) ───────────────────
-type EnrichedPoint = SalesDataPoint & {
-  mom: number | null; // 전월 대비 매출 변화율(%)
-  yoy: number | null; // 전년 동월 대비 매출 변화율(%)
-};
-
-// ── 선택된 월 상세 패널 ──────────────────────────────────
-interface SelectedMonthDetail {
-  fullIndex: number;
-  point: EnrichedPoint;
-}
-
 // ── 커스텀 툴팁 ─────────────────────────────────────────
-interface TooltipEntry {
-  name: string;
-  value: number;
-  color: string;
-  payload: EnrichedPoint;
-}
 
-interface LongTermTooltipProps {
-  active?: boolean;
-  payload?: TooltipEntry[];
-  label?: string;
-}
-
-const LongTermTooltip = ({ active, payload, label }: LongTermTooltipProps) => {
+const LongTermTooltip = ({ active, payload, label }: ChartTooltipProps<EnrichedSalesPoint>) => {
   if (!active || !payload?.length) return null;
   const point = payload[0].payload;
   const achievementRate = Math.round((point.revenue / point.target) * 100);
@@ -130,11 +110,11 @@ const LongTermTooltip = ({ active, payload, label }: LongTermTooltipProps) => {
  * - 그래프 클릭 → 월별 상세 패널 + 상세 리포트 링크
  */
 export const SalesComboChart = ({ data }: SalesComboChartProps) => {
-  const [period, setPeriod] = useState<Period>(12);
+  const [period, setPeriod] = useState<ChartPeriod>(12);
   const [selectedDetail, setSelectedDetail] = useState<SelectedMonthDetail | null>(null);
 
   /** 전체 데이터에 전월·전년 변화율 사전 계산 */
-  const enrichedAll = useMemo<EnrichedPoint[]>(
+  const enrichedAll = useMemo<EnrichedSalesPoint[]>(
     () =>
       data.map((d, i) => ({
         ...d,
@@ -145,7 +125,7 @@ export const SalesComboChart = ({ data }: SalesComboChartProps) => {
   );
 
   /** 기간 슬라이싱 */
-  const chartData = useMemo<EnrichedPoint[]>(
+  const chartData = useMemo<EnrichedSalesPoint[]>(
     () => enrichedAll.slice(-period),
     [enrichedAll, period],
   );
@@ -169,7 +149,7 @@ export const SalesComboChart = ({ data }: SalesComboChartProps) => {
     );
   };
 
-  const handlePeriodChange = (p: Period) => {
+  const handlePeriodChange = (p: ChartPeriod) => {
     setPeriod(p);
     setSelectedDetail(null);
   };
@@ -207,7 +187,7 @@ export const SalesComboChart = ({ data }: SalesComboChartProps) => {
 
           {/* 기간 필터 */}
           <div className="flex gap-xs">
-            {([6, 12] as Period[]).map((p) => (
+            {([6, 12] as ChartPeriod[]).map((p) => (
               <button
                 key={p}
                 type="button"
