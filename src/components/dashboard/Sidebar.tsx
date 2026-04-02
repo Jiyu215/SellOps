@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   DashboardOutlined,
   ShoppingOutlined,
@@ -14,8 +16,6 @@ import type { UserProfile } from '@/types/dashboard';
 
 interface SidebarProps {
   currentUser: UserProfile;
-  activeMenu?: string;
-  onMenuChange?: (menu: string) => void;
   /** DashboardLayout 에서 관리하는 모바일 열림 상태 */
   mobileOpen: boolean;
   /** 오버레이 클릭 또는 메뉴 선택 시 닫기 콜백 */
@@ -32,37 +32,41 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { key: 'dashboard', label: '대시보드', icon: <DashboardOutlined />, href: '/dashboard/dashboard' },
-  { key: 'products', label: '재고 관리', icon: <ShoppingOutlined />, href: '/dashboard/products' },
-  { key: 'analytics', label: '데이터 분석', icon: <BarChartOutlined />, href: '/dashboard/analytics' },
-  { key: 'orders', label: '주문 관리', icon: <ShoppingCartOutlined />, href: '/dashboard/sales' },
-  { key: 'customers', label: '사용자 관리', icon: <TeamOutlined />, href: '/dashboard/customers' },
+  { key: 'dashboard', label: '대시보드',   icon: <DashboardOutlined />,    href: '/dashboard/dashboard' },
+  { key: 'products',  label: '재고 관리',  icon: <ShoppingOutlined />,     href: '/dashboard/products'  },
+  { key: 'analytics', label: '데이터 분석', icon: <BarChartOutlined />,    href: '/dashboard/analytics' },
+  { key: 'orders',    label: '주문 관리',  icon: <ShoppingCartOutlined />, href: '/dashboard/orders'    },
+  { key: 'customers', label: '사용자 관리', icon: <TeamOutlined />,        href: '/dashboard/customers' },
 ];
 
 /**
  * 대시보드 사이드바
  *
- * - 모바일 (< 768px): 기본 숨김 → mobileOpen 시 좌측에서 슬라이드인
- *   햄버거 버튼은 Header 에 통합됨 (부유 버튼 없음)
- * - 태블릿 (768px~1279px): 아이콘 전용 w-16 고정 표시
- * - PC (≥ 1280px): w-[190px] 전체 레이블 표시
+ * - URL(`usePathname`)을 active 상태의 단일 출처(source of truth)로 사용
+ *   → 새로고침·URL 공유 시에도 active 상태가 정확히 반영됨
+ * - 내비게이션 항목은 `<Link>`로 구현
+ *   → Next.js prefetch, 접근성(키보드), 우클릭 새 탭 지원
+ * - 주문관리 링크(`/dashboard/orders`)는 query params 없이 이동
+ *   → useOrderFilter가 URL 기반이므로 자동으로 필터·검색어 초기화
  *
- * 로고:
- *   - 태블릿: logo-128.png (정방형 아이콘)
- *   - 모바일/PC: logo.svg (가로형 워드마크)
+ * 반응형:
+ *   - 모바일 (< 768px): 기본 숨김 → mobileOpen 시 좌측에서 슬라이드인
+ *   - 태블릿 (768px~1279px): 아이콘 전용 w-16 고정 표시
+ *   - PC (≥ 1280px): w-[190px] 전체 레이블 표시
  */
 export const Sidebar = ({
   currentUser,
-  activeMenu = 'dashboard',
-  onMenuChange,
   mobileOpen,
   onMobileClose,
   onLogout,
 }: SidebarProps) => {
-  const handleMenuClick = (key: string) => {
-    onMenuChange?.(key);
-    onMobileClose();
-  };
+  const pathname = usePathname();
+
+  /**
+   * 현재 경로가 해당 nav item의 active 상태인지 판별
+   * pathname.startsWith(item.href): 하위 라우트(/dashboard/orders/[id] 등)도 active 처리
+   */
+  const isActive = (href: string) => pathname.startsWith(href);
 
   const initials = currentUser.name.slice(0, 2);
 
@@ -96,10 +100,6 @@ export const Sidebar = ({
       >
         {/* ① 브랜드 로고 영역 */}
         <div className="flex items-center justify-center xl:justify-start h-16 px-sm md:px-0 xl:px-md border-b border-light-border dark:border-dark-border flex-shrink-0">
-          {/*
-            태블릿 (아이콘 전용 w-16): 정방형 로고 아이콘
-            모바일 / PC: 가로형 워드마크 SVG
-          */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/images/logo-128.png"
@@ -134,22 +134,22 @@ export const Sidebar = ({
         <nav className="flex-1 overflow-y-auto py-sm" aria-label="주요 메뉴">
           <ul className="space-y-xs px-sm">
             {NAV_ITEMS.map((item) => {
-              const isActive = activeMenu === item.key;
+              const active = isActive(item.href);
               return (
                 <li key={item.key}>
-                  <button
-                    type="button"
-                    onClick={() => handleMenuClick(item.key)}
+                  <Link
+                    href={item.href}
                     title={item.label}
+                    onClick={onMobileClose}
                     className={[
                       'w-full flex items-center gap-sm px-sm py-sm rounded-md',
                       'text-bodySm font-medium transition-all duration-150',
                       'justify-center xl:justify-start',
-                      isActive
+                      active
                         ? 'bg-light-secondary dark:bg-dark-secondary text-light-primary dark:text-dark-primary border-l-[3px] border-light-primary dark:border-dark-primary pl-[5px]'
                         : 'text-light-textSecondary dark:text-dark-textSecondary hover:bg-light-secondary dark:hover:bg-dark-secondary hover:text-light-textPrimary dark:hover:text-dark-textPrimary',
                     ].join(' ')}
-                    aria-current={isActive ? 'page' : undefined}
+                    aria-current={active ? 'page' : undefined}
                   >
                     <span className="text-bodyLg flex-shrink-0" aria-hidden="true">
                       {item.icon}
@@ -157,7 +157,7 @@ export const Sidebar = ({
                     <span className="block md:hidden xl:block whitespace-nowrap">
                       {item.label}
                     </span>
-                  </button>
+                  </Link>
                 </li>
               );
             })}

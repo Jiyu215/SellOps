@@ -74,6 +74,25 @@ module.exports = {
         caption: ['0.75rem', { lineHeight: '1rem', letterSpacing: '0px' }],
         overline: ['0.625rem', { lineHeight: '0.75rem', letterSpacing: '1px', fontWeight: '500' }],
       },
+      keyframes: {
+        'modal-backdrop': {
+          from: { opacity: '0' },
+          to:   { opacity: '1' },
+        },
+        'modal-slide-up': {
+          from: { transform: 'translateY(100%)' },
+          to:   { transform: 'translateY(0)' },
+        },
+        'modal-fade-scale': {
+          from: { opacity: '0', transform: 'scale(0.96) translateY(8px)' },
+          to:   { opacity: '1', transform: 'scale(1) translateY(0)' },
+        },
+      },
+      animation: {
+        'modal-backdrop':   'modal-backdrop 0.25s ease-out forwards',
+        'modal-slide-up':   'modal-slide-up 0.32s cubic-bezier(0.32, 0.72, 0, 1) forwards',
+        'modal-fade-scale': 'modal-fade-scale 0.2s ease-out forwards',
+      },
     },
   },
   plugins: [],

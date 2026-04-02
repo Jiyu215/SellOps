@@ -53,14 +53,30 @@ export interface InventoryItem {
 }
 
 // ── 주문 ──────────────────────────────────────────────────
-export type OrderStatus =
-  | 'pending'
-  | 'paid'
-  | 'preparing'
-  | 'shipped'
-  | 'delivered'
-  | 'cancelled'
-  | 'refunded';
+
+/** 주문 상태 */
+export type OrderStatusType =
+  | 'order_waiting'   // 주문대기
+  | 'order_confirmed' // 주문확정
+  | 'order_cancelled' // 주문취소
+  | 'order_completed'; // 주문완료
+
+/** 결제 상태 */
+export type PaymentStatusType =
+  | 'payment_pending'    // 결제대기
+  | 'payment_completed'  // 결제완료
+  | 'payment_failed'     // 결제실패
+  | 'payment_cancelled'  // 결제취소
+  | 'refund_in_progress' // 환불중
+  | 'refund_completed';  // 환불완료
+
+/** 배송 상태 */
+export type ShippingStatusType =
+  | 'shipping_ready'       // 배송준비
+  | 'shipping_in_progress' // 배송중
+  | 'shipping_completed'   // 배송완료
+  | 'shipping_on_hold'     // 배송보류
+  | 'return_completed';    // 반품완료
 
 export type PaymentMethod = 'card' | 'bank_transfer' | 'kakao_pay' | 'naver_pay';
 
@@ -85,7 +101,9 @@ export interface Order {
   products: OrderProduct[];
   totalAmount: number;
   paymentMethod: PaymentMethod;
-  status: OrderStatus;
+  orderStatus: OrderStatusType;
+  paymentStatus: PaymentStatusType;
+  shippingStatus: ShippingStatusType;
   createdAt: string; // ISO 8601
   shippingAddress?: string;
 }
@@ -93,7 +111,9 @@ export interface Order {
 // ── 필터 / 검색 ───────────────────────────────────────────
 export interface OrderFilter {
   search: string;
-  status: OrderStatus | 'all';
+  orderStatus: OrderStatusType | 'all';
+  paymentStatus: PaymentStatusType | 'all';
+  shippingStatus: ShippingStatusType | 'all';
   paymentMethod: PaymentMethod | 'all';
   dateRange?: { from: string; to: string };
 }
