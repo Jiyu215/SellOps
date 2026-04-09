@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useMemo } from 'react';
+import Link from 'next/link';
 import {
   SearchOutlined,
   FilterOutlined,
@@ -258,7 +258,6 @@ const FilterSelect = ({
  * - 행·카드 클릭 → /dashboard/orders/:id
  */
 export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: OrderTableProps) => {
-  const router = useRouter();
   const {
     filter,
     currentPage,
@@ -317,12 +316,6 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
   const paginatedOrders = filteredOrders.slice(
     (safePage - 1) * pageSize,
     safePage * pageSize,
-  );
-
-  // ── 행·카드 클릭 ──────────────────────────────────────────────────────────
-  const handleRowClick = useCallback(
-    (id: string) => router.push(`/dashboard/orders/${id}`),
-    [router],
   );
 
   // ── 렌더 ─────────────────────────────────────────────────────────────────
@@ -425,18 +418,16 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
                 return (
                   <tr
                     key={order.id}
-                    onClick={() => handleRowClick(order.id)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleRowClick(order.id); }}
-                    role="link"
-                    tabIndex={0}
-                    aria-label={`주문 ${order.orderNumber} 상세 보기`}
-                    className="border-b border-light-border dark:border-dark-border last:border-0 hover:bg-light-secondary dark:hover:bg-dark-secondary transition-colors cursor-pointer"
+                    className="border-b border-light-border dark:border-dark-border last:border-0 hover:bg-light-secondary dark:hover:bg-dark-secondary transition-colors"
                   >
-                    {/* 주문번호 */}
+                    {/* 주문번호 — 클릭 시 상세 이동 */}
                     <td className="py-sm px-sm pl-0">
-                      <span className="font-mono text-caption text-light-primary dark:text-dark-primary font-semibold whitespace-nowrap">
+                      <Link
+                        href={`/dashboard/orders/${order.id}`}
+                        className="font-mono text-caption text-light-primary dark:text-dark-primary font-semibold whitespace-nowrap hover:underline"
+                      >
                         {order.orderNumber}
-                      </span>
+                      </Link>
                     </td>
 
                     {/* 고객정보: 아바타 + 이름 + 회원등급 배지 */}
@@ -523,7 +514,7 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
                     {/* 액션 셀 (orders variant 전용) */}
                     {isOrdersVariant && onOrderUpdate && (
                       <td className="py-sm px-sm text-right">
-                        <OrderActionCell order={order} onOrderUpdate={onOrderUpdate} />
+                        <OrderActionCell order={order} onOrderUpdate={onOrderUpdate} showDetailLink />
                       </td>
                     )}
                     {isOrdersVariant && !onOrderUpdate && (
@@ -550,18 +541,16 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
             return (
               <div
                 key={order.id}
-                onClick={() => handleRowClick(order.id)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleRowClick(order.id); }}
-                role="link"
-                tabIndex={0}
-                aria-label={`주문 ${order.orderNumber} 상세 보기`}
-                className="border border-light-border dark:border-dark-border rounded-md p-sm flex flex-col gap-sm cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:bg-light-secondary dark:hover:bg-dark-secondary"
+                className="border border-light-border dark:border-dark-border rounded-md p-sm flex flex-col gap-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:bg-light-secondary dark:hover:bg-dark-secondary"
               >
-                {/* 카드 헤더: 주문번호 + 주문 상태 */}
+                {/* 카드 헤더: 주문번호(클릭 이동) + 주문 상태 */}
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-caption text-light-primary dark:text-dark-primary font-semibold">
+                  <Link
+                    href={`/dashboard/orders/${order.id}`}
+                    className="font-mono text-caption text-light-primary dark:text-dark-primary font-semibold hover:underline"
+                  >
                     {order.orderNumber}
-                  </span>
+                  </Link>
                   <StatusBadge {...ORDER_STATUS_MAP[order.orderStatus]} />
                 </div>
 

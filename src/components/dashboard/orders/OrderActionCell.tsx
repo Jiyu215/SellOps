@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { MoreOutlined, CloseOutlined } from '@ant-design/icons';
 import type { Order } from '@/types/dashboard';
 import type { ActionKey } from '@/types/orderActions';
@@ -11,8 +12,10 @@ import { ACTION_CONFIG, getActionsForOrder, getTransitionForAction } from '@/uti
 type OrderStatusPartial = Partial<Pick<Order, 'orderStatus' | 'paymentStatus' | 'shippingStatus'>>;
 
 interface OrderActionCellProps {
-  order:         Order;
-  onOrderUpdate: (id: string, partial: OrderStatusPartial) => void;
+  order:           Order;
+  onOrderUpdate:   (id: string, partial: OrderStatusPartial) => void;
+  /** true 이면 상세보기 링크를 함께 렌더링한다 */
+  showDetailLink?: boolean;
 }
 
 // ── 확인 모달 ─────────────────────────────────────────────────────────────
@@ -178,7 +181,7 @@ const ConfirmModal = ({ title, message, confirmLabel, isDanger, onConfirm, onCan
  * - 버튼 클릭 → 확인 모달 → 확정 시 onOrderUpdate 호출.
  * - 행 클릭(상세 이동) 전파를 차단한다.
  */
-export const OrderActionCell = ({ order, onOrderUpdate }: OrderActionCellProps) => {
+export const OrderActionCell = ({ order, onOrderUpdate, showDetailLink = false }: OrderActionCellProps) => {
   const [pendingAction, setPendingAction] = useState<ActionKey | null>(null);
   const [menuOpen,      setMenuOpen]      = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -216,9 +219,35 @@ export const OrderActionCell = ({ order, onOrderUpdate }: OrderActionCellProps) 
     setMenuOpen((prev) => !prev);
   }, []);
 
-  if (primaryActions.length === 0 && menuActions.length === 0) return null;
+  const isTerminal = primaryActions.length === 0 && menuActions.length === 0;
+
+  // showDetailLink 없이 종료 상태면 아무것도 렌더하지 않는다
+  if (isTerminal && !showDetailLink) return null;
 
   const modalConfig = pendingAction ? ACTION_CONFIG[pendingAction] : null;
+
+  const detailHref = `/dashboard/orders/${order.id}`;
+  const detailLinkClass = 'text-caption font-semibold px-sm py-xs rounded-md whitespace-nowrap transition-colors bg-light-secondary dark:bg-dark-secondary text-light-textSecondary dark:text-dark-textSecondary hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-light-primary dark:hover:text-dark-primary';
+
+  // 종료 상태: 상세보기 버튼만 단독 표시
+  if (isTerminal) {
+    return (
+      <div
+        className="flex items-center gap-xs justify-end"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <Link href={detailHref} onClick={(e) => e.stopPropagation()} className={detailLinkClass}>
+          상세보기
+        </Link>
+      </div>
+    );
+  }
+
+  // 활성 상태: ⋯ 메뉴에 상세보기 추가 여부 결정
+  // - menuActions 가 이미 있으면 → ⋯ 메뉴 마지막에 상세보기 Link 아이템 추가
+  // - menuActions 가 없으면   → ⋯ 메뉴 새로 생성 (상세보기 전용)
+  const hasMenuWithDetail = showDetailLink;
 
   return (
     <>
@@ -247,8 +276,8 @@ export const OrderActionCell = ({ order, onOrderUpdate }: OrderActionCellProps) 
           );
         })}
 
-        {/* ⋯ 드롭다운 메뉴 (menuActions 가 있을 때만) */}
-        {menuActions.length > 0 && (
+        {/* ⋯ 드롭다운 메뉴 (menuActions 또는 showDetailLink 일 때) */}
+        {(menuActions.length > 0 || hasMenuWithDetail) && (
           <div className="relative" ref={menuRef}>
             <button
               type="button"
@@ -286,6 +315,18 @@ export const OrderActionCell = ({ order, onOrderUpdate }: OrderActionCellProps) 
                     </button>
                   );
                 })}
+
+                {/* 상세보기 — showDetailLink 일 때 ⋯ 메뉴 마지막 항목 */}
+                {showDetailLink && (
+                  <Link
+                    href={detailHref}
+                    role="menuitem"
+                    onClick={(e) => e.stopPropagation()}
+                    className="block w-full text-left px-md py-xs text-bodySm whitespace-nowrap transition-colors text-light-textPrimary dark:text-dark-textPrimary hover:bg-light-secondary dark:hover:bg-dark-secondary"
+                  >
+                    상세보기
+                  </Link>
+                )}
               </div>
             )}
           </div>
