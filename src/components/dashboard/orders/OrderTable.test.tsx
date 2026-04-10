@@ -4,6 +4,22 @@ import { OrderTable } from './OrderTable';
 import * as useOrderFilterModule from '@/hooks/useOrderFilter';
 import type { Order } from '@/types/dashboard';
 
+// ── window.matchMedia 모킹 ────────────────────────────────────────────────────
+// OrderTable이 useMediaQuery를 사용하므로 jsdom 환경에서 matchMedia 모킹 필요
+
+beforeEach(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: jest.fn((query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    })),
+  });
+});
+
 // ── useOrderFilter 모킹 ───────────────────────────────────────────────────────
 // useSearchParams(next/navigation)를 내부에서 사용하므로 훅 전체를 모킹
 
