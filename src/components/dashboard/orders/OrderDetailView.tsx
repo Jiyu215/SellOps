@@ -562,10 +562,11 @@ export const OrderDetailView = ({ order, onOrderUpdate }: OrderDetailViewProps) 
   const paymentInfo        = PAYMENT_BADGE[order.paymentMethod];
 
   const productTotal   = order.products.reduce((sum, p) => sum + p.unitPrice * p.quantity, 0);
-  const couponDiscount = order.coupon?.status === 'applied' ? order.coupon.discountAmount : 0;
-  const pointDiscount  = order.pointDiscount ?? 0;
+  const baseAmount     = productTotal + order.shippingFee;
+  const couponDiscount = order.coupon?.status === 'applied' ? Math.min(order.coupon.discountAmount, baseAmount) : 0;
+  const pointDiscount  = Math.min(order.pointDiscount ?? 0, Math.max(0, baseAmount - couponDiscount));
   const totalDiscount  = couponDiscount + pointDiscount;
-  const finalAmount    = productTotal + order.shippingFee - totalDiscount;
+  const finalAmount    = baseAmount - totalDiscount;
 
   return (
     <div className="flex flex-col gap-md">
