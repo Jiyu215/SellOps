@@ -43,7 +43,7 @@
 * 동작:
 
   * 상태 변경 시 페이지는 1로 초기화
-  * URL query에 반영 (`?status=paid`)
+  *  URL query에 반영 (`?order_status=order_confirmed`, `?payment_status=payment_completed`, `?shipping_status=shipping_in_progress`)
 
 
 ### 검색 기능
@@ -73,16 +73,18 @@
 * 기본 페이지 사이즈: N개 (상수)
 * 동작:
 
-  * 페이지 변경 시 URL query 업데이트 (`?page=2`)
+  * 페이지 변경 시 URL query 업데이트 (`?order_page=2`)
   * 필터/검색 변경 시 페이지 1로 초기화
 
 ### URL 상태 관리
 
 * query params:
 
-  * `search`
-  * `status`
-  * `page`
+  * `order_search`
+  * `order_status`
+  * `payment_status`
+  * `shipping_status`
+  * `order_page`
 
 * 요구사항:
 
@@ -127,10 +129,10 @@ GET /orders
 
 #### Query Params
 
-* page: number
-* pageSize: number
-* status: string
-* search: string
+* order_status: string
+* payment_status: string
+* shipping_status: string
+* order_search: string
 
 #### Response
 
