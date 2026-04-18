@@ -112,8 +112,19 @@ export const PAYMENT_OPTIONS: Array<{ value: string; label: string }> = [
 
 // ── 유틸리티 ────────────────────────────────────────────────────────────
 
+const SEOUL_FORMATTER = new Intl.DateTimeFormat('ko-KR', {
+  timeZone: 'Asia/Seoul',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
 /** ISO 날짜 문자열을 'YYYY.MM.DD HH:mm' 형식으로 포맷 */
 export const formatOrderDate = (iso: string): string => {
-  const d = new Date(iso);
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const parts = SEOUL_FORMATTER.formatToParts(new Date(iso));
+  const get = (type: string) => parts.find(p => p.type === type)?.value ?? '';
+  return `${get('year')}.${get('month')}.${get('day')} ${get('hour')}:${get('minute')}`;
 };
