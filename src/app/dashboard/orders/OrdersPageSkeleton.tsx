@@ -24,8 +24,8 @@ export const OrdersPageSkeleton = () => (
 
     {/* 테이블 헤더 행 */}
     <div className={`h-px w-full ${SK} mb-sm`} />
-    <div className="hidden lg:grid grid-cols-6 gap-sm mb-sm">
-      {Array.from({ length: 6 }).map((_, i) => (
+    <div className="hidden md:grid md:grid-cols-7 xl:grid-cols-10 gap-sm mb-sm">
+      {Array.from({ length: 7 }).map((_, i) => (
         <div key={i} className={`h-4 ${SK}`} />
       ))}
     </div>
@@ -34,7 +34,7 @@ export const OrdersPageSkeleton = () => (
     {/* 데이터 행 × 5 */}
     <div className="flex flex-col gap-sm">
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="hidden lg:grid grid-cols-6 gap-sm items-center py-sm border-b border-light-border dark:border-dark-border last:border-0">
+        <div key={i} className="hidden md:grid md:grid-cols-7 xl:grid-cols-10 gap-sm items-center py-sm border-b border-light-border dark:border-dark-border last:border-0">
           <div className={`h-4 w-28 ${SK}`} />
           <div className="flex items-center gap-sm">
             <div className={`w-8 h-8 rounded-full ${SK} flex-shrink-0`} />
@@ -48,7 +48,7 @@ export const OrdersPageSkeleton = () => (
       ))}
       {/* 모바일 카드 스켈레톤 × 3 */}
       {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className={`lg:hidden h-24 rounded-md ${SK}`} />
+        <div key={i} className={`md:hidden h-24 rounded-md ${SK}`} />
       ))}
     </div>
 
