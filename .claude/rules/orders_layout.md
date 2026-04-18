@@ -123,7 +123,7 @@
 
 ### 주문 목록 조회
 
-```
+```http
 GET /orders
 ```
 
@@ -145,13 +145,13 @@ GET /orders
 
 ### 주문 상세 조회
 
-```
+```http
 GET /orders/:id
 ```
 
 ### 주문 상태 변경
 
-```
+```http
 PATCH /orders/:id/status
 ```
 
