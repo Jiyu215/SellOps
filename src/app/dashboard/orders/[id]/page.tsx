@@ -16,6 +16,13 @@ interface OrderDetailPageProps {
  * - params는 Next.js 16 비동기 타입으로 await 처리.
  * - 존재하지 않는 주문 ID → notFound() 호출.
  */
+
+export async function generateMetadata({ params }: OrderDetailPageProps) {
+  const { id } = await params;
+  const order = await getOrderDetail(id);
+  return { title: order ? `주문 ${order.orderNumber} | SellOps` : '주문 상세' };
+}
+
 export default async function OrderDetailPage({ params }: OrderDetailPageProps) {
   const { id } = await params;
   const order = await getOrderDetail(id);

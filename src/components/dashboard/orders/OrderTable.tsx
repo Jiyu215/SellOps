@@ -189,7 +189,11 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
     currentPage,
     handleSearch,
     handleOrderStatusChange,
+    
+    // NOTE: paymentMethod filter는 향후 결제수단별 분석/필터링 기능 확장 시 사용 예정
+    // 현재 OrderTable UI에서는 제공하지 않음
     handlePaymentStatusChange,
+    
     handleShippingStatusChange,
     setCurrentPage,
   } = useOrderFilter();
