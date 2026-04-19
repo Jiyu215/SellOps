@@ -79,10 +79,16 @@ export function useOrderFilter() {
       const params = new URLSearchParams(searchParams.toString());
 
       Object.entries(updates).forEach(([key, value]) => {
-        if (value === null || value === '' || value === 'all' || value === '1') {
+        const shouldDelete = 
+          value === null ||
+          value === '' ||
+          (key !== KEY_SEARCH && value === 'all') ||
+          (key === KEY_PAGE && value === '1');
+
+        if (shouldDelete){
           params.delete(key);
-        } else if (value !== undefined) {
-          params.set(key, value);
+        }else if(value!==undefined){
+          params.set(key,value);
         }
       });
 
