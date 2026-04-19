@@ -9,7 +9,7 @@ import {
   LeftOutlined,
   RightOutlined,
 } from '@ant-design/icons';
-import type { Order, OrderStatusType, PaymentStatusType, ShippingStatusType } from '@/types/dashboard';
+import type { Order } from '@/types/dashboard';
 import { OrderActionCell } from '@/components/dashboard/orders/OrderActionCell';
 import { matchesKorean } from '@/utils/choseong';
 import { useOrderFilter } from '@/hooks/useOrderFilter';
@@ -27,6 +27,18 @@ import {
   COLOR_PURPLE,
 } from '@/constants/config';
 
+import {
+  ORDER_STATUS_MAP,
+  PAYMENT_STATUS_MAP,
+  SHIPPING_STATUS_MAP,
+  PAYMENT_BADGE,
+  TIER_BADGE,
+  ORDER_STATUS_OPTIONS,
+  PAYMENT_STATUS_OPTIONS,
+  SHIPPING_STATUS_OPTIONS,
+  formatOrderDate,
+} from '@/constants/orderConstants';
+
 interface OrderTableProps {
   orders: Order[];
   /**
@@ -38,84 +50,6 @@ interface OrderTableProps {
   /** orders variant 전용: 상태 변경 시 호출 */
   onOrderUpdate?: (id: string, partial: Partial<Pick<Order, 'orderStatus' | 'paymentStatus' | 'shippingStatus'>>) => void;
 }
-
-// ── 상태 맵 (모듈 수준 — 렌더와 무관하게 한 번만 생성) ─────────────────────
-
-const ORDER_STATUS_MAP: Record<
-  OrderStatusType,
-  { label: string; dotColor: string; badgeClass: string }
-> = {
-  order_waiting:   { label: '주문대기', dotColor: 'bg-light-warning dark:bg-dark-warning',             badgeClass: 'text-light-warning dark:text-dark-warning'                          },
-  order_confirmed: { label: '주문확정', dotColor: 'bg-light-info dark:bg-dark-info',                   badgeClass: 'text-light-info dark:text-dark-info'                                },
-  order_cancelled: { label: '주문취소', dotColor: 'bg-light-error dark:bg-dark-error',                 badgeClass: 'text-light-error dark:text-dark-error font-bold'                    },
-  order_completed: { label: '주문완료', dotColor: 'bg-light-success dark:bg-dark-success',             badgeClass: 'text-light-success dark:text-dark-success'                          },
-};
-
-const PAYMENT_STATUS_MAP: Record<
-  PaymentStatusType,
-  { label: string; dotColor: string; badgeClass: string }
-> = {
-  payment_pending:    { label: '결제대기', dotColor: 'bg-light-warning dark:bg-dark-warning',           badgeClass: 'text-light-warning dark:text-dark-warning'                          },
-  payment_completed:  { label: '결제완료', dotColor: 'bg-light-primary dark:bg-dark-primary',           badgeClass: 'text-light-primary dark:text-dark-primary'                          },
-  payment_failed:     { label: '결제실패', dotColor: 'bg-light-error dark:bg-dark-error',               badgeClass: 'text-light-error dark:text-dark-error font-bold'                    },
-  payment_cancelled:  { label: '결제취소', dotColor: 'bg-light-textSecondary dark:bg-dark-textSecondary', badgeClass: 'text-light-textSecondary dark:text-dark-textSecondary'            },
-  refund_in_progress: { label: '환불중',   dotColor: 'bg-light-warning dark:bg-dark-warning',           badgeClass: 'text-light-warning dark:text-dark-warning'                          },
-  refund_completed:   { label: '환불완료', dotColor: 'bg-light-textSecondary dark:bg-dark-textSecondary', badgeClass: 'text-light-textSecondary dark:text-dark-textSecondary'            },
-};
-
-const SHIPPING_STATUS_MAP: Record<
-  ShippingStatusType,
-  { label: string; dotColor: string; badgeClass: string }
-> = {
-  shipping_ready:       { label: '배송준비', dotColor: 'bg-purple-500',                              badgeClass: 'text-purple-600 dark:text-purple-400'                               },
-  shipping_in_progress: { label: '배송중',   dotColor: 'bg-indigo-500',                              badgeClass: 'text-indigo-600 dark:text-indigo-400'                               },
-  shipping_completed:   { label: '배송완료', dotColor: 'bg-light-success dark:bg-dark-success',      badgeClass: 'text-light-success dark:text-dark-success'                          },
-  shipping_on_hold:     { label: '배송보류', dotColor: 'bg-light-warning dark:bg-dark-warning',      badgeClass: 'text-light-warning dark:text-dark-warning'                          },
-  return_completed:     { label: '반품완료', dotColor: 'bg-light-textSecondary dark:bg-dark-textSecondary', badgeClass: 'text-light-textSecondary dark:text-dark-textSecondary'       },
-};
-
-const PAYMENT_BADGE: Record<string, { label: string; badgeClass: string }> = {
-  card:          { label: '신용카드',  badgeClass: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'                                },
-  bank_transfer: { label: '계좌이체',  badgeClass: 'bg-gray-100 dark:bg-gray-800/50 text-light-textSecondary dark:text-dark-textSecondary'          },
-  kakao_pay:     { label: '카카오페이', badgeClass: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'                       },
-  naver_pay:     { label: '네이버페이', badgeClass: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'                           },
-};
-
-const TIER_BADGE: Record<string, string> = {
-  VIP:    'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300',
-  Gold:   'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
-  Silver: 'bg-gray-100 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300',
-  일반:   'bg-light-secondary dark:bg-dark-secondary text-light-textSecondary dark:text-dark-textSecondary',
-};
-
-// ── 필터 옵션 (모듈 수준) ──────────────────────────────────────────────────
-
-const ORDER_STATUS_OPTIONS: Array<{ value: OrderStatusType | 'all'; label: string }> = [
-  { value: 'all',             label: '전체 주문상태' },
-  { value: 'order_waiting',   label: '주문대기'      },
-  { value: 'order_confirmed', label: '주문확정'      },
-  { value: 'order_cancelled', label: '주문취소'      },
-  { value: 'order_completed', label: '주문완료'      },
-];
-
-const PAYMENT_STATUS_OPTIONS: Array<{ value: PaymentStatusType | 'all'; label: string }> = [
-  { value: 'all',               label: '전체 결제상태' },
-  { value: 'payment_pending',   label: '결제대기'      },
-  { value: 'payment_completed', label: '결제완료'      },
-  { value: 'payment_failed',    label: '결제실패'      },
-  { value: 'payment_cancelled', label: '결제취소'      },
-  { value: 'refund_in_progress', label: '환불중'       },
-  { value: 'refund_completed',  label: '환불완료'      },
-];
-
-const SHIPPING_STATUS_OPTIONS: Array<{ value: ShippingStatusType | 'all'; label: string }> = [
-  { value: 'all',                 label: '전체 배송상태' },
-  { value: 'shipping_ready',      label: '배송준비'      },
-  { value: 'shipping_in_progress', label: '배송중'       },
-  { value: 'shipping_completed',  label: '배송완료'      },
-  { value: 'shipping_on_hold',    label: '배송보류'      },
-  { value: 'return_completed',    label: '반품완료'      },
-];
 
 /**
  * 반응형 컬럼 구성
@@ -155,14 +89,6 @@ const AVATAR_COLORS = [
   COLOR_PRIMARY, COLOR_SUCCESS, COLOR_INFO, COLOR_WARNING, COLOR_ERROR, COLOR_PURPLE,
 ] as const;
 
-// ── 유틸 함수 (순수 함수 — 모듈 수준) ────────────────────────────────────────
-
-/** 날짜 포맷: YYYY.MM.DD HH:mm */
-const formatDate = (iso: string): string => {
-  const d = new Date(iso);
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-};
-
 /** CSV 내보내기 */
 const exportToCSV = (orders: Order[]): void => {
   const headers = ['주문번호', '고객명', '이메일', '상품', '금액', '결제방법', '주문상태', '결제상태', '배송상태', '주문일시'];
@@ -176,7 +102,7 @@ const exportToCSV = (orders: Order[]): void => {
     ORDER_STATUS_MAP[o.orderStatus].label,
     PAYMENT_STATUS_MAP[o.paymentStatus].label,
     SHIPPING_STATUS_MAP[o.shippingStatus].label,
-    formatDate(o.createdAt),
+    formatOrderDate(o.createdAt),
   ]);
 
   const csvContent = [headers, ...rows]
@@ -507,7 +433,7 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
                     {/* 주문 일시 */}
                     <td className="py-sm px-sm">
                       <span className="text-caption text-light-textSecondary dark:text-dark-textSecondary whitespace-nowrap">
-                        {formatDate(order.createdAt)}
+                        {formatOrderDate(order.createdAt)}
                       </span>
                     </td>
 
@@ -594,7 +520,7 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
                       <span key={i}>{i > 0 && ', '}{p.name} ×{p.quantity}</span>
                     ))}
                   </p>
-                  <p className="mt-xs">{formatDate(order.createdAt)}</p>
+                  <p className="mt-xs">{formatOrderDate(order.createdAt)}</p>
                 </div>
               </div>
             );
