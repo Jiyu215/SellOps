@@ -12,8 +12,16 @@
 /** 주문 검색 입력 디바운스 지연 시간 (ms) */
 export const SEARCH_DEBOUNCE_DELAY_MS = 300;
 
-/** 주문 목록 페이지당 표시 건수 */
-export const ORDER_PAGE_SIZE = 5;
+/**
+ * 주문 목록 페이지당 표시 건수 — 화면 크기별 분리
+ *
+ * PC (≥1280px)     : 50행 — 충분한 화면 폭으로 전체 컬럼 + 많은 행 표시
+ * 태블릿 (768~1279px): 30행 — 결제방식 컬럼 숨김, 적당한 밀도 유지
+ * 모바일 (≤767px)   : 15행 — 카드형 표시, 스크롤 피로 최소화
+ */
+export const ORDER_PAGE_SIZE_PC      = 50;
+export const ORDER_PAGE_SIZE_TABLET  = 30;
+export const ORDER_PAGE_SIZE_MOBILE  = 15;
 
 // ── 애니메이션 ────────────────────────────────────────────────────────────────
 

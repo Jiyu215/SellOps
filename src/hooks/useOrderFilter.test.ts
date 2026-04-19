@@ -25,7 +25,9 @@ describe('초기 상태 파싱', () => {
   test('URL 파라미터 없으면 기본값 반환', () => {
     const { result } = renderHook(() => useOrderFilter());
     expect(result.current.filter.search).toBe('');
-    expect(result.current.filter.status).toBe('all');
+    expect(result.current.filter.orderStatus).toBe('all');
+    expect(result.current.filter.paymentStatus).toBe('all');
+    expect(result.current.filter.shippingStatus).toBe('all');
     expect(result.current.filter.paymentMethod).toBe('all');
     expect(result.current.currentPage).toBe(1);
   });
@@ -36,10 +38,22 @@ describe('초기 상태 파싱', () => {
     expect(result.current.filter.search).toBe('홍길동');
   });
 
-  test('order_status 파라미터를 상태 필터로 읽는다', () => {
-    mockSearchParamsString = 'order_status=shipped';
+  test('order_status 파라미터를 주문 상태 필터로 읽는다', () => {
+    mockSearchParamsString = 'order_status=order_confirmed';
     const { result } = renderHook(() => useOrderFilter());
-    expect(result.current.filter.status).toBe('shipped');
+    expect(result.current.filter.orderStatus).toBe('order_confirmed');
+  });
+
+  test('payment_status 파라미터를 결제 상태 필터로 읽는다', () => {
+    mockSearchParamsString = 'payment_status=payment_completed';
+    const { result } = renderHook(() => useOrderFilter());
+    expect(result.current.filter.paymentStatus).toBe('payment_completed');
+  });
+
+  test('shipping_status 파라미터를 배송 상태 필터로 읽는다', () => {
+    mockSearchParamsString = 'shipping_status=shipping_in_progress';
+    const { result } = renderHook(() => useOrderFilter());
+    expect(result.current.filter.shippingStatus).toBe('shipping_in_progress');
   });
 
   test('order_page 파라미터를 페이지 번호로 읽는다', () => {
@@ -48,10 +62,10 @@ describe('초기 상태 파싱', () => {
     expect(result.current.currentPage).toBe(3);
   });
 
-  test('유효하지 않은 status 값은 "all"로 폴백', () => {
+  test('유효하지 않은 order_status 값은 "all"로 폴백', () => {
     mockSearchParamsString = 'order_status=invalid_status';
     const { result } = renderHook(() => useOrderFilter());
-    expect(result.current.filter.status).toBe('all');
+    expect(result.current.filter.orderStatus).toBe('all');
   });
 
   test('유효하지 않은 page 값은 1로 폴백', () => {
@@ -97,32 +111,66 @@ describe('handleSearch', () => {
   });
 });
 
-// ── handleStatusChange ────────────────────────────────────────────────────────
+// ── handleOrderStatusChange ──────────────────────────────────────────────────
 
-describe('handleStatusChange', () => {
-  test('상태 필터를 URL에 반영하고 페이지를 1로 초기화한다', () => {
+describe('handleOrderStatusChange', () => {
+  test('주문 상태 필터를 URL에 반영하고 페이지를 1로 초기화한다', () => {
     mockSearchParamsString = 'order_page=2';
     const { result } = renderHook(() => useOrderFilter());
 
     act(() => {
-      result.current.handleStatusChange('shipped');
+      result.current.handleOrderStatusChange('order_confirmed');
     });
 
     const calledUrl = mockReplace.mock.calls[0][0] as string;
-    expect(calledUrl).toContain('order_status=shipped');
+    expect(calledUrl).toContain('order_status=order_confirmed');
     expect(calledUrl).not.toContain('order_page=');
   });
 
   test('"all" 선택 시 URL에서 order_status 제거', () => {
-    mockSearchParamsString = 'order_status=shipped';
+    mockSearchParamsString = 'order_status=order_confirmed';
     const { result } = renderHook(() => useOrderFilter());
 
     act(() => {
-      result.current.handleStatusChange('all');
+      result.current.handleOrderStatusChange('all');
     });
 
     const calledUrl = mockReplace.mock.calls[0][0] as string;
     expect(calledUrl).not.toContain('order_status');
+  });
+});
+
+// ── handlePaymentStatusChange ─────────────────────────────────────────────────
+
+describe('handlePaymentStatusChange', () => {
+  test('결제 상태 필터를 URL에 반영하고 페이지를 1로 초기화한다', () => {
+    mockSearchParamsString = 'order_page=2';
+    const { result } = renderHook(() => useOrderFilter());
+
+    act(() => {
+      result.current.handlePaymentStatusChange('payment_completed');
+    });
+
+    const calledUrl = mockReplace.mock.calls[0][0] as string;
+    expect(calledUrl).toContain('payment_status=payment_completed');
+    expect(calledUrl).not.toContain('order_page=');
+  });
+});
+
+// ── handleShippingStatusChange ────────────────────────────────────────────────
+
+describe('handleShippingStatusChange', () => {
+  test('배송 상태 필터를 URL에 반영하고 페이지를 1로 초기화한다', () => {
+    mockSearchParamsString = 'order_page=2';
+    const { result } = renderHook(() => useOrderFilter());
+
+    act(() => {
+      result.current.handleShippingStatusChange('shipping_in_progress');
+    });
+
+    const calledUrl = mockReplace.mock.calls[0][0] as string;
+    expect(calledUrl).toContain('shipping_status=shipping_in_progress');
+    expect(calledUrl).not.toContain('order_page=');
   });
 });
 
@@ -173,7 +221,7 @@ describe('URL 기본값 정리', () => {
 
     // 기본값("all")으로 상태 변경 시 파라미터 없는 URL
     act(() => {
-      result.current.handleStatusChange('all');
+      result.current.handleOrderStatusChange('all');
     });
 
     const calledUrl = mockReplace.mock.calls[0][0] as string;
@@ -185,7 +233,7 @@ describe('URL 기본값 정리', () => {
     const { result } = renderHook(() => useOrderFilter());
 
     act(() => {
-      result.current.handleStatusChange('shipped');
+      result.current.handleOrderStatusChange('order_confirmed');
     });
 
     expect(mockReplace).toHaveBeenCalledWith(

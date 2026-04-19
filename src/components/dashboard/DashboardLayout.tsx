@@ -17,6 +17,8 @@ interface DashboardLayoutProps {
  * 대시보드 공통 레이아웃
  * Sidebar + Header + Main Content 구조
  *
+ * - active 메뉴 상태: Sidebar 내부에서 usePathname()으로 URL 기반 판별
+ *   → 로컬 state 불필요, 새로고침·공유 URL에서도 정확히 동작
  * - mobileOpen 상태: Header(햄버거 버튼) ↔ Sidebar(슬라이드인) 공유
  * - notifications 상태: 읽음 처리를 포함한 알림 목록 관리
  */
@@ -27,7 +29,6 @@ export const DashboardLayout = ({
   notifications: initialNotifications = [],
 }: DashboardLayoutProps) => {
   const router = useRouter();
-  const [activeMenu, setActiveMenu] = useState('dashboard');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
 
@@ -54,8 +55,6 @@ export const DashboardLayout = ({
     <div className="h-screen bg-light-background dark:bg-dark-background flex overflow-hidden">
       <Sidebar
         currentUser={currentUser}
-        activeMenu={activeMenu}
-        onMenuChange={setActiveMenu}
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
         onLogout={handleLogout}

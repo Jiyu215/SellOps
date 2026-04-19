@@ -4,22 +4,49 @@ import { OrderTable } from './OrderTable';
 import * as useOrderFilterModule from '@/hooks/useOrderFilter';
 import type { Order } from '@/types/dashboard';
 
+// ── window.matchMedia 모킹 ────────────────────────────────────────────────────
+// OrderTable이 useMediaQuery를 사용하므로 jsdom 환경에서 matchMedia 모킹 필요
+
+beforeEach(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: jest.fn((query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    })),
+  });
+});
+
 // ── useOrderFilter 모킹 ───────────────────────────────────────────────────────
 // useSearchParams(next/navigation)를 내부에서 사용하므로 훅 전체를 모킹
 
 jest.mock('@/hooks/useOrderFilter');
 
-const mockHandleSearch      = jest.fn();
-const mockHandleStatus      = jest.fn();
-const mockSetCurrentPage    = jest.fn();
+const mockHandleSearch               = jest.fn();
+const mockHandleOrderStatus          = jest.fn();
+const mockHandlePaymentStatus        = jest.fn();
+const mockHandleShippingStatus       = jest.fn();
+const mockSetCurrentPage             = jest.fn();
 
 function mockFilterReturn(overrides: Partial<ReturnType<typeof useOrderFilterModule.useOrderFilter>> = {}) {
   (useOrderFilterModule.useOrderFilter as jest.Mock).mockReturnValue({
-    filter:            { search: '', status: 'all', paymentMethod: 'all' },
-    currentPage:       1,
-    handleSearch:      mockHandleSearch,
-    handleStatusChange: mockHandleStatus,
-    setCurrentPage:    mockSetCurrentPage,
+    filter: {
+      search: '',
+      orderStatus:   'all',
+      paymentStatus: 'all',
+      shippingStatus: 'all',
+      paymentMethod: 'all',
+    },
+    currentPage:                1,
+    handleSearch:               mockHandleSearch,
+    handleOrderStatusChange:    mockHandleOrderStatus,
+    handlePaymentStatusChange:  mockHandlePaymentStatus,
+    handleShippingStatusChange: mockHandleShippingStatus,
+    setCurrentPage:             mockSetCurrentPage,
+    handlePaymentChange:        jest.fn(),
     ...overrides,
   });
 }
@@ -34,7 +61,7 @@ const MOCK_ORDERS: Order[] = [
     products: [{ name: '기계식 키보드', sku: 'KB-001', quantity: 1, unitPrice: 89000 }],
     totalAmount: 89000,
     paymentMethod: 'card',
-    status: 'paid',
+    orderStatus: 'order_confirmed', paymentStatus: 'payment_completed', shippingStatus: 'shipping_ready',
     createdAt: '2026-03-20T10:00:00Z',
   },
   {
@@ -44,7 +71,7 @@ const MOCK_ORDERS: Order[] = [
     products: [{ name: '무선 마우스', sku: 'MS-002', quantity: 2, unitPrice: 45000 }],
     totalAmount: 90000,
     paymentMethod: 'kakao_pay',
-    status: 'shipped',
+    orderStatus: 'order_confirmed', paymentStatus: 'payment_completed', shippingStatus: 'shipping_in_progress',
     createdAt: '2026-03-21T11:00:00Z',
   },
 ];
@@ -58,7 +85,9 @@ afterAll(() => jest.useRealTimers());
 beforeEach(() => {
   jest.clearAllTimers();
   mockHandleSearch.mockClear();
-  mockHandleStatus.mockClear();
+  mockHandleOrderStatus.mockClear();
+  mockHandlePaymentStatus.mockClear();
+  mockHandleShippingStatus.mockClear();
   mockSetCurrentPage.mockClear();
   mockFilterReturn();
 });
@@ -72,7 +101,15 @@ describe('기본 렌더링', () => {
   });
 
   test('초기 검색어가 입력창에 표시된다', () => {
-    mockFilterReturn({ filter: { search: '홍길동', status: 'all', paymentMethod: 'all' } });
+    mockFilterReturn({
+      filter: {
+        search: '홍길동',
+        orderStatus: 'all',
+        paymentStatus: 'all',
+        shippingStatus: 'all',
+        paymentMethod: 'all',
+      },
+    });
     render(<OrderTable orders={MOCK_ORDERS} />);
     expect(screen.getByRole('searchbox')).toHaveValue('홍길동');
   });
@@ -364,8 +401,6 @@ describe('공백 처리 (모든 공백 제거)', () => {
 
 describe('입력값 보존', () => {
   test('URL filter.search가 바뀌어도 사용자가 입력한 inputValue를 덮어쓰지 않는다', () => {
-    // 사용자가 'ab'를 입력한 상태에서 URL이 'a'로 갱신될 경우를 시뮬레이션
-    // (빠른 타이핑 중 이전 URL 업데이트가 늦게 도착하는 시나리오)
     const { rerender } = render(<OrderTable orders={MOCK_ORDERS} />);
     const input = screen.getByRole('searchbox');
 
@@ -373,12 +408,15 @@ describe('입력값 보존', () => {
     fireEvent.change(input, { target: { value: 'ab' } });
     expect(input).toHaveValue('ab');
 
-    // URL이 'a'로 갱신됨 (이전 keystroke의 지연 응답) — filter.search만 'a'로 바뀜
+    // URL이 'a'로 갱신됨 (이전 keystroke의 지연 응답)
     mockFilterReturn({
-      filter: { search: 'a', status: 'all', paymentMethod: 'all' },
-      handleSearch: mockHandleSearch,
-      handleStatusChange: mockHandleStatus,
-      setCurrentPage: mockSetCurrentPage,
+      filter: {
+        search: 'a',
+        orderStatus: 'all',
+        paymentStatus: 'all',
+        shippingStatus: 'all',
+        paymentMethod: 'all',
+      },
     });
     rerender(<OrderTable orders={MOCK_ORDERS} />);
 
@@ -388,10 +426,13 @@ describe('입력값 보존', () => {
 
   test('페이지 최초 진입 시 URL 검색어로 입력창을 초기화한다', () => {
     mockFilterReturn({
-      filter: { search: '홍길동', status: 'all', paymentMethod: 'all' },
-      handleSearch: mockHandleSearch,
-      handleStatusChange: mockHandleStatus,
-      setCurrentPage: mockSetCurrentPage,
+      filter: {
+        search: '홍길동',
+        orderStatus: 'all',
+        paymentStatus: 'all',
+        shippingStatus: 'all',
+        paymentMethod: 'all',
+      },
     });
     render(<OrderTable orders={MOCK_ORDERS} />);
 
@@ -402,12 +443,12 @@ describe('입력값 보존', () => {
 // ── 상태 필터 ─────────────────────────────────────────────────────────────────
 
 describe('상태 필터', () => {
-  test('필터 select 변경 시 handleStatusChange가 호출된다', () => {
+  test('주문 상태 필터 select 변경 시 handleOrderStatusChange가 호출된다', () => {
     render(<OrderTable orders={MOCK_ORDERS} />);
     const select = screen.getByRole('combobox', { name: '주문 상태 필터' });
 
-    fireEvent.change(select, { target: { value: 'shipped' } });
+    fireEvent.change(select, { target: { value: 'order_confirmed' } });
 
-    expect(mockHandleStatus).toHaveBeenCalledWith('shipped');
+    expect(mockHandleOrderStatus).toHaveBeenCalledWith('order_confirmed');
   });
 });
