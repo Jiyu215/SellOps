@@ -370,12 +370,18 @@ const StatusTimeline = ({ entries }: { entries: OrderStatusHistoryEntry[] }) => 
  */
 
 // TODO: 실 서비스에서는 useAuth() 등 인증 컨텍스트에서 주입받는다
-const MOCK_CURRENT_USER: { authorName: string; authorType: MemoAuthorType } = {
-  authorName: '김운영자',
-  authorType: 'admin',
+const MOCK_CURRENT_USER: { name: string; type: MemoAuthorType } = {
+  name: '김운영자',
+  type: 'admin',
 };
 
-const MemoLog = ({ initialEntries }: { initialEntries: OrderMemoEntry[] }) => {
+const MemoLog = ({ initialEntries }: { 
+  initialEntries: OrderMemoEntry[];
+  actor: {
+    name: string;
+    type: MemoAuthorType;
+  };
+}) => {
   const [entries, setEntries] = useState<OrderMemoEntry[]>(initialEntries);
   const [content, setContent] = useState('');
   const scrollRef             = useRef<HTMLDivElement>(null);
@@ -387,8 +393,8 @@ const MemoLog = ({ initialEntries }: { initialEntries: OrderMemoEntry[] }) => {
     const newEntry: OrderMemoEntry = {
       id:         `memo-${Date.now()}`,
       timestamp:  new Date().toISOString(),
-      author:     MOCK_CURRENT_USER.authorName,
-      authorType: MOCK_CURRENT_USER.authorType,
+      author:     MOCK_CURRENT_USER.name,
+      authorType: MOCK_CURRENT_USER.type,
       content:    trimmed,
     };
 
@@ -473,12 +479,12 @@ const MemoLog = ({ initialEntries }: { initialEntries: OrderMemoEntry[] }) => {
         {/* 현재 작성자 표시 */}
         <div className="flex items-center gap-xs px-sm pt-xs pb-0">
           <span
-            className={`text-[11px] font-semibold px-xs py-[2px] rounded-full ${MEMO_AUTHOR_CONFIG[MOCK_CURRENT_USER.authorType].badgeClass}`}
+            className={`text-[11px] font-semibold px-xs py-[2px] rounded-full ${MEMO_AUTHOR_CONFIG[MOCK_CURRENT_USER.type].badgeClass}`}
           >
-            {MEMO_AUTHOR_CONFIG[MOCK_CURRENT_USER.authorType].label}
+            {MEMO_AUTHOR_CONFIG[MOCK_CURRENT_USER.type].label}
           </span>
           <span className="text-caption font-semibold text-light-textPrimary dark:text-dark-textPrimary">
-            {MOCK_CURRENT_USER.authorName}
+            {MOCK_CURRENT_USER.name}
           </span>
         </div>
 
@@ -832,7 +838,10 @@ export const OrderDetailView = ({ order, onOrderUpdate }: OrderDetailViewProps) 
 
       {/* ── 섹션 6: 주문 메모 ──────────────────────────────────────────────── */}
       <SectionCard title="주문 메모">
-        <MemoLog initialEntries={order.memoLog} />
+        <MemoLog 
+          initialEntries={order.memoLog} 
+          actor={MOCK_CURRENT_USER}
+          />
       </SectionCard>
 
       {/* ── 섹션 7: 액션 버튼 ──────────────────────────────────────────────── */}
