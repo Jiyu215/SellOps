@@ -69,6 +69,16 @@ export function useSearchInput({
   const onSearchRef = useRef(onSearch);
   useEffect(() => { onSearchRef.current = onSearch; }, [onSearch]);
 
+  useEffect(()=>{
+    const normalized = initialValue.replace(/\s+/g, '');
+    setInputValue(initialValue);
+    lastTriggeredRef.current = normalized;
+    if (debounceTimerRef.current !== null) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+  },[initialValue]);
+
   // 언마운트 시 펜딩 타이머·요청 정리
   useEffect(() => {
     return () => {
