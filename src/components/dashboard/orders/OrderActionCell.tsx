@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { MoreOutlined, CloseOutlined } from '@ant-design/icons';
 import type { Order } from '@/types/dashboard';
@@ -16,6 +17,12 @@ interface OrderActionCellProps {
   onOrderUpdate:   (id: string, partial: OrderStatusPartial) => void;
   /** true 이면 상세보기 링크를 함께 렌더링한다 */
   showDetailLink?: boolean;
+  /**
+   * 렌더 변형
+   * - 'table' (기본): 우측 정렬 컴팩트 버튼 + ⋯ 드롭다운 (PC/태블릿 테이블 셀용)
+   * - 'card':         가로 균등 버튼 행 (모바일 카드 하단용) — 메뉴 액션도 인라인 표시
+   */
+  variant?: 'table' | 'card';
 }
 
 // ── 확인 모달 ─────────────────────────────────────────────────────────────
@@ -34,17 +41,18 @@ interface ConfirmModalProps {
  *
  * ### 너비 / 높이 breakpoint 전략
  *
- * | 구간                 | 형태         | 너비                              | 최대 높이  |
- * |---------------------|------------|-----------------------------------|-----------|
- * | 모바일   <768px      | 하단 시트    | 100vw (w-full)                   | 85vh      |
- * | 태블릿   768–1023px  | 중앙 다이얼로그 | 420px (max: 100vw-2rem)         | 80vh      |
- * | 데스크탑 1024–1279px | 중앙 다이얼로그 | 440px                           | 80vh      |
- * | 와이드   ≥1280px     | 중앙 다이얼로그 | 460px                           | 80vh      |
+ * | 구간                 | 형태            | 너비                              | 최대 높이  |
+ * |---------------------|---------------|-----------------------------------|-----------|
+ * | 모바일   <768px      | 하단 고정 시트   | 100vw (w-full)                   | 85vh      |
+ * | 태블릿   768–1023px  | 중앙 다이얼로그  | 420px (max: 100vw-2rem)          | 80vh      |
+ * | 데스크탑 1024–1279px | 중앙 다이얼로그  | 440px                            | 80vh      |
+ * | 와이드   ≥1280px     | 중앙 다이얼로그  | 460px                            | 80vh      |
  *
  * ### UX
- * - 모바일: 상단 핸들바, 세로 스택 버튼 (확정↑ / 취소↓), 터치 타겟 py-sm
- * - 태블릿+: 우상단 X 버튼, 가로 우정렬 버튼, 컴팩트 py-xs
- * - 공통: ESC 닫기, 백드롭 클릭 닫기, body 스크롤 잠금, overflow-y-auto 안전망
+ * - 모바일: createPortal로 document.body에 직접 마운트 → 부모 transform 영향 없음
+ *           하단 고정, hover 효과 없음, 백드롭 클릭 시 취소
+ * - 태블릿+: 우상단 X 버튼, 가로 정렬 버튼, hover 효과 적용
+ * - 공통: ESC 닫기, body 스크롤 잠금, overflow-y-auto 안전망
  */
 const ConfirmModal = ({ title, message, confirmLabel, isDanger, onConfirm, onCancel }: ConfirmModalProps) => {
   // ESC 키 닫기 + body 스크롤 잠금
@@ -63,9 +71,9 @@ const ConfirmModal = ({ title, message, confirmLabel, isDanger, onConfirm, onCan
     };
   }, [onCancel]);
 
-  return (
+  const modal = (
     // ── 오버레이 컨테이너 ──────────────────────────────────────────────
-    // 모바일: items-end → 패널이 화면 최하단에 정렬
+    // 모바일: items-end → 패널이 화면 최하단에 고정
     // 태블릿+(md): items-center → 패널이 수직 중앙에
     <div
       className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
@@ -74,7 +82,7 @@ const ConfirmModal = ({ title, message, confirmLabel, isDanger, onConfirm, onCan
       aria-labelledby="action-modal-title"
       onClick={onCancel}
     >
-      {/* 백드롭 */}
+      {/* 백드롭: 클릭 시 onCancel 위임 (부모 div onClick으로 처리) */}
       <div
         className="absolute inset-0 bg-black/50 animate-modal-backdrop"
         aria-hidden="true"
@@ -82,23 +90,22 @@ const ConfirmModal = ({ title, message, confirmLabel, isDanger, onConfirm, onCan
 
       {/* ── 모달 패널 ────────────────────────────────────────────────────
           너비: 모바일 100% → 태블릿 420px → 데스크탑 440px → 와이드 460px
-          높이: 모바일 max 85vh → 태블릿+ max 80vh  (overflow-y-auto로 스크롤)
-          패딩: 모바일 소형 → 태블릿+ 표준
-          애니메이션: 모바일 slide-up, md+ fade-scale (cascade 후순위 덮어씀) */}
+          높이: 모바일 max 85vh → 태블릿+ max 80vh (overflow-y-auto로 스크롤)
+          애니메이션: 모바일 slide-up, md+ fade-scale */}
       <div
         className={[
           // 공통
           'relative w-full bg-light-surface dark:bg-dark-surface shadow-xl z-10',
-          'overflow-y-auto',   // 콘텐츠 초과 시 스크롤 안전망
+          'overflow-y-auto',
 
-          // ── 모바일 (<768px): 하단 시트 ──
+          // ── 모바일 (<768px): 하단 고정 시트, hover 효과 없음 ──
           'rounded-t-lg animate-modal-slide-up',
-          'max-h-[85vh]',      // 백드롭 상단 15% 노출 확보
-          'px-md pt-xs pb-xl', // 하단 여백 넉넉히 (홈 인디케이터 영역)
+          'max-h-[85vh]',
+          'px-md pt-xs pb-xl',
 
           // ── 태블릿 (≥768px): 중앙 다이얼로그 ──
           'md:rounded-lg md:animate-modal-fade-scale',
-          'md:w-[420px] md:max-w-[calc(100vw-2rem)]', // 뷰포트 끝에 닿지 않도록 fallback
+          'md:w-[420px] md:max-w-[calc(100vw-2rem)]',
           'md:max-h-[80vh]',
           'md:px-lg md:pt-lg md:pb-lg',
 
@@ -120,7 +127,7 @@ const ConfirmModal = ({ title, message, confirmLabel, isDanger, onConfirm, onCan
           type="button"
           onClick={onCancel}
           aria-label="모달 닫기"
-          className="hidden md:flex absolute top-md right-md p-xs rounded-md text-light-textSecondary dark:text-dark-textSecondary hover:bg-light-secondary dark:hover:bg-dark-secondary transition-colors"
+          className="hidden md:flex absolute top-md right-md p-xs rounded-md text-light-textSecondary dark:text-dark-textSecondary md:hover:bg-light-secondary dark:md:hover:bg-dark-secondary transition-colors"
         >
           <CloseOutlined aria-hidden="true" />
         </button>
@@ -138,17 +145,20 @@ const ConfirmModal = ({ title, message, confirmLabel, isDanger, onConfirm, onCan
           {message}
         </p>
 
-        {/* ── 버튼 그룹: 모든 화면에서 가운데 정렬 ────────────────────── */}
+        {/* ── 버튼 그룹 ────────────────────────────────────────────────────
+            모바일: 세로 스택, 터치 타겟(py-sm), hover 효과 없음
+            태블릿+: 가로 정렬(md:flex-row), 컴팩트(md:py-xs), hover 효과 적용 */}
         <div className="flex flex-col-reverse gap-sm items-center md:flex-row md:justify-center">
           <button
             type="button"
             onClick={onCancel}
             className={[
-              'w-full md:w-auto px-md rounded-md text-bodySm font-medium transition-colors',
+              'w-full md:w-auto px-md rounded-md text-bodySm font-medium',
               'py-sm md:py-xs',
               'border border-light-border dark:border-dark-border',
               'text-light-textSecondary dark:text-dark-textSecondary',
-              'hover:bg-light-secondary dark:hover:bg-dark-secondary',
+              'md:hover:bg-light-secondary dark:md:hover:bg-dark-secondary',
+              'md:transition-colors',
             ].join(' ')}
           >
             취소
@@ -157,11 +167,12 @@ const ConfirmModal = ({ title, message, confirmLabel, isDanger, onConfirm, onCan
             type="button"
             onClick={onConfirm}
             className={[
-              'w-full md:w-auto px-md rounded-md text-bodySm font-semibold text-white transition-colors',
+              'w-full md:w-auto px-md rounded-md text-bodySm font-semibold text-white',
               'py-sm md:py-xs',
+              'md:transition-opacity',
               isDanger
-                ? 'bg-light-error dark:bg-dark-error hover:opacity-90'
-                : 'bg-light-primary dark:bg-dark-primary hover:opacity-90',
+                ? 'bg-light-error dark:bg-dark-error md:hover:opacity-90'
+                : 'bg-light-primary dark:bg-dark-primary md:hover:opacity-90',
             ].join(' ')}
           >
             {confirmLabel}
@@ -170,6 +181,11 @@ const ConfirmModal = ({ title, message, confirmLabel, isDanger, onConfirm, onCan
       </div>
     </div>
   );
+
+  // createPortal: document.body에 직접 마운트
+  // → 부모 카드의 CSS transform(hover:-translate-y)에 의한
+  //   fixed 포지셔닝 오염을 원천 차단
+  return createPortal(modal, document.body);
 };
 
 // ── 메인 컴포넌트 ─────────────────────────────────────────────────────────
@@ -181,7 +197,7 @@ const ConfirmModal = ({ title, message, confirmLabel, isDanger, onConfirm, onCan
  * - 버튼 클릭 → 확인 모달 → 확정 시 onOrderUpdate 호출.
  * - 행 클릭(상세 이동) 전파를 차단한다.
  */
-export const OrderActionCell = ({ order, onOrderUpdate, showDetailLink = false }: OrderActionCellProps) => {
+export const OrderActionCell = ({ order, onOrderUpdate, showDetailLink = false, variant = 'table' }: OrderActionCellProps) => {
   const [pendingAction, setPendingAction] = useState<ActionKey | null>(null);
   const [menuOpen,      setMenuOpen]      = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -228,6 +244,84 @@ export const OrderActionCell = ({ order, onOrderUpdate, showDetailLink = false }
 
   const detailHref = `/dashboard/orders/${order.id}`;
   const detailLinkClass = 'text-caption font-semibold px-sm py-xs rounded-md whitespace-nowrap transition-colors bg-light-secondary dark:bg-dark-secondary text-light-textSecondary dark:text-dark-textSecondary hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-light-primary dark:hover:text-dark-primary';
+
+  // ── card 변형 렌더 ───────────────────────────────────────────────────────
+  // 모바일 카드 하단 가로 버튼 행
+  // - 메뉴 액션도 인라인으로 표시 (드롭다운 없음)
+  // - 모든 버튼 flex-1 균등 분할
+  if (variant === 'card') {
+    const allCardActions = [...primaryActions, ...menuActions];
+    const stopPropClick = (e: React.MouseEvent) => e.stopPropagation();
+    const stopPropKeyDown = (e: React.KeyboardEvent) => e.stopPropagation();
+
+    // 종료 상태: 상세보기 버튼만 표시
+    if (isTerminal) {
+      if (!showDetailLink) return null;
+      return (
+        <>
+          <div className="flex gap-xs" onClick={stopPropClick} onKeyDown={stopPropKeyDown}>
+            <Link
+              href={detailHref}
+              onClick={stopPropClick}
+              className="flex-1 text-center text-caption font-semibold px-sm py-xs rounded-md whitespace-nowrap transition-colors bg-light-secondary dark:bg-dark-secondary text-light-textSecondary dark:text-dark-textSecondary hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-light-primary dark:hover:text-dark-primary"
+            >
+              상세보기
+            </Link>
+          </div>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <div className="flex gap-xs" onClick={stopPropClick} onKeyDown={stopPropKeyDown}>
+          {allCardActions.map((key) => {
+            const cfg = ACTION_CONFIG[key];
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={(e) => handleActionClick(key, e)}
+                className={[
+                  'flex-1 text-center text-caption font-semibold px-sm py-xs rounded-md whitespace-nowrap transition-colors',
+                  cfg.buttonVariant === 'danger'
+                    ? 'bg-red-100 dark:bg-red-900/30 text-light-error dark:text-dark-error hover:bg-red-200 dark:hover:bg-red-800/40'
+                    : 'bg-light-secondary dark:bg-dark-secondary text-light-primary dark:text-dark-primary hover:bg-blue-100 dark:hover:bg-blue-900/30',
+                ].join(' ')}
+              >
+                {cfg.label}
+              </button>
+            );
+          })}
+
+          {/* 상세보기 링크 (카드 변형) */}
+          {showDetailLink && (
+            <Link
+              href={detailHref}
+              onClick={stopPropClick}
+              className="flex-1 text-center text-caption font-semibold px-sm py-xs rounded-md whitespace-nowrap transition-colors bg-light-secondary dark:bg-dark-secondary text-light-textSecondary dark:text-dark-textSecondary hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-light-primary dark:hover:text-dark-primary"
+            >
+              상세보기
+            </Link>
+          )}
+        </div>
+
+        {/* 확인 모달 */}
+        {modalConfig && (
+          <ConfirmModal
+            title={modalConfig.modalTitle}
+            message={modalConfig.modalMessage}
+            confirmLabel={modalConfig.confirmLabel}
+            isDanger={modalConfig.buttonVariant === 'danger'}
+            onConfirm={handleConfirm}
+            onCancel={handleCancel}
+          />
+        )}
+      </>
+    );
+  }
+
+  // ── table 변형 렌더 (기본) ───────────────────────────────────────────────
 
   // 종료 상태: 상세보기 버튼만 단독 표시
   if (isTerminal) {

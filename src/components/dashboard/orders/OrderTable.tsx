@@ -522,6 +522,18 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
                   </p>
                   <p className="mt-xs">{formatOrderDate(order.createdAt)}</p>
                 </div>
+
+                {/* 액션 버튼 행 (orders variant 전용) */}
+                {isOrdersVariant && onOrderUpdate && (
+                  <div className="border-t border-light-border dark:border-dark-border pt-xs">
+                    <OrderActionCell
+                      order={order}
+                      onOrderUpdate={onOrderUpdate}
+                      showDetailLink
+                      variant="card"
+                    />
+                  </div>
+                )}
               </div>
             );
           })
