@@ -377,7 +377,7 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
                     <td className={`py-sm px-sm${isOrdersVariant ? ' hidden xl:table-cell' : ''}`}>
                       <div className="flex flex-col gap-xs max-w-[180px]">
                         {order.products.map((p, i) => (
-                          <div key={i} className="flex items-center justify-between gap-sm">
+                          <div key={`${p.sku}-${i}`} className="flex items-center justify-between gap-sm">
                             <span className="text-caption text-light-textPrimary dark:text-dark-textPrimary truncate">
                               {p.name} ×{p.quantity}
                             </span>
@@ -517,7 +517,7 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
                 <div className="border-t border-light-border dark:border-dark-border pt-xs text-caption text-light-textSecondary dark:text-dark-textSecondary">
                   <p className="truncate">
                     {order.products.map((p, i) => (
-                      <span key={i}>{i > 0 && ', '}{p.name} ×{p.quantity}</span>
+                      <span key={`${p.sku}-${i}`}>{i > 0 && ', '}{p.name} ×{p.quantity}</span>
                     ))}
                   </p>
                   <p className="mt-xs">{formatOrderDate(order.createdAt)}</p>
