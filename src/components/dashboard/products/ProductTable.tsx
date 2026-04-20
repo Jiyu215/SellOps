@@ -570,12 +570,9 @@ export const ProductTable = ({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // 필터 변경 시 선택 초기화
-  const prevFilterKey = useRef('');
-  const filterKey = `${filter.search}|${filter.status}|${filter.sort}|${filter.page}|${filter.limit}`;
-  if (prevFilterKey.current !== filterKey) {
-    prevFilterKey.current = filterKey;
-    if (selectedIds.size > 0) setSelectedIds(new Set());
-  }
+  useEffect(() => {
+    setSelectedIds((prev) => (prev.size === 0 ? prev : new Set()));
+  }, [filter.search, filter.status, filter.sort, filter.page, filter.limit]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
