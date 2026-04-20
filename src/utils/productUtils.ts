@@ -159,8 +159,9 @@ export function exportProductsToCSV(products: ProductListItem[]): 'success' | 'e
       formatProductDate(p.updatedAt),
     ]);
 
+    const escapeCsvCell = (cell: unknown) => `"${String(cell).replace(/"/g, '""')}"`;
     const csv = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${cell}"`).join(','))
+      .map((row) => row.map(escapeCsvCell).join(','))
       .join('\n');
 
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
