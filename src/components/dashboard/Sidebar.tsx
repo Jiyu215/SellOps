@@ -33,7 +33,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', label: '대시보드',   icon: <DashboardOutlined />,    href: '/dashboard/dashboard' },
-  { key: 'products',  label: '재고 관리',  icon: <ShoppingOutlined />,     href: '/dashboard/products'  },
+  { key: 'products',  label: '상품 관리',  icon: <ShoppingOutlined />,     href: '/dashboard/products'  },
   { key: 'analytics', label: '데이터 분석', icon: <BarChartOutlined />,    href: '/dashboard/analytics' },
   { key: 'orders',    label: '주문 관리',  icon: <ShoppingCartOutlined />, href: '/dashboard/orders'    },
   { key: 'customers', label: '사용자 관리', icon: <TeamOutlined />,        href: '/dashboard/customers' },
