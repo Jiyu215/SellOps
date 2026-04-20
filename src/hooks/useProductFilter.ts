@@ -100,18 +100,25 @@ export function useProductFilter() {
   );
 
   const handleStatusChange = useCallback(
-    (value: string) => updateParams({ [KEY_STATUS]: value, [KEY_PAGE]: null }),
+    (value: string) => {
+      if (!VALID_STATUSES.has(value)) return;
+      updateParams({ [KEY_STATUS]: value, [KEY_PAGE]: null })
+    },
     [updateParams],
   );
 
   const handleSortChange = useCallback(
-    (value: string) => updateParams({ [KEY_SORT]: value, [KEY_PAGE]: null }),
+    (value: string) => {
+      if (!VALID_SORTS.has(value)) return;
+      updateParams({ [KEY_SORT]: value, [KEY_PAGE]: null })
+    },
     [updateParams],
   );
 
   const handlePageChange = useCallback(
     (newPage: number | ((prev: number) => number)) => {
-      const next = typeof newPage === 'function' ? newPage(page) : newPage;
+      const raw = typeof newPage === 'function' ? newPage(page) : newPage;
+      const next = Number.isFinite(raw) ? Math.max(1, Math.trunc(raw)) : 1;
       updateParams({ [KEY_PAGE]: String(next) });
     },
     [page, updateParams],
