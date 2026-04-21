@@ -1014,6 +1014,7 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
           </button>
 
           {/* 삭제 (수정 모드만) */}
+          {/* TODO: Supabase 연동 시 삭제 기능 구현 */}
           {!currentIsNew && (
             <Link
               href={`/dashboard/products`}

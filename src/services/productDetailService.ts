@@ -64,11 +64,14 @@ export async function checkProductCode(
   excludeId?: string,
 ): Promise<{ available: boolean }> {
   // Mock: prod-001의 코드인 KB-MXS-BLK은 이미 사용 중 (자기 자신 수정 시엔 제외)
-  const usedCodes = new Set(
-    [...MOCK_PRODUCT_DETAIL_MAP.values()]
+  const usedCodes = new Set([
+    ...MOCK_PRODUCTS
       .filter((p) => p.id !== excludeId)
       .map((p) => p.productCode),
-  );
+    ...[...MOCK_PRODUCT_DETAIL_MAP.values()]
+      .filter((p) => p.id !== excludeId)
+      .map((p) => p.productCode),
+  ]);
   return { available: !usedCodes.has(code) };
 }
 
