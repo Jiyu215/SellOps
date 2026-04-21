@@ -5,7 +5,7 @@
  * 2-Column 레이아웃(메인 + 사이드)을 반영한 스켈레톤 구조를 확인합니다.
  */
 
-import { render, container } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { ProductDetailSkeleton } from './ProductDetailSkeleton';
 
 // ─────────────────────────────────────────────────────────────────────────────
