@@ -127,6 +127,23 @@ export async function adjustStock(
     }
     next.available -= quantity;
   }
+
+  MOCK_PRODUCT_DETAIL_MAP.set(id, {
+    ...product,
+    stock: next,
+    updatedAt: new Date().toISOString(),
+  });
+
+  const listIdx = MOCK_PRODUCTS.findIndex((p) => p.id === id);
+  if (listIdx >= 0) {
+    MOCK_PRODUCTS[listIdx] = {
+      ...MOCK_PRODUCTS[listIdx],
+      totalStock: next.total,
+      availableStock: next.available,
+      soldCount: next.sold,
+      updatedAt: new Date().toISOString(),
+    };
+  }
   return next;
 }
 
