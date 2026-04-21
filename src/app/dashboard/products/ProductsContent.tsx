@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from 'react';
 import { ProductTable } from '@/components/dashboard/products';
-import { MOCK_PRODUCTS } from '@/constants/productsMockData';
 import type { ProductListItem, ProductStatus } from '@/types/products';
 
 interface ProductsContentProps {
@@ -21,7 +20,7 @@ interface ProductsContentProps {
  */
 export const ProductsContent = ({ initialProducts }: ProductsContentProps) => {
   const [products, setProducts] = useState<ProductListItem[]>(
-    () => initialProducts ?? [...MOCK_PRODUCTS],
+    () => initialProducts ?? [],
   );
   const [exportLoading, setExportLoading] = useState(false);
 
