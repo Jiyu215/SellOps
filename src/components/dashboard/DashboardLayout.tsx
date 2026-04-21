@@ -58,7 +58,7 @@ export const DashboardLayout = ({
       /* nativeScroll: 브라우저 기본 스크롤 사용, 사이드바만 sticky 고정 */
       <div className="min-h-screen bg-light-background dark:bg-dark-background flex">
         {/* 사이드바: sticky로 스크롤 시에도 뷰포트 좌측에 고정 */}
-        <div className="sticky top-0 self-start h-screen shrink-0 overflow-hidden">
+        <div className="sticky top-0 self-start h-screen shrink-0 overflow-hidden w-0 md:w-16 xl:w-[190px]">
           <Sidebar
             currentUser={currentUser}
             mobileOpen={mobileOpen}
