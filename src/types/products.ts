@@ -104,6 +104,7 @@ export type StockAdjustmentType = 'in' | 'out';
 // ── 재고 이력 ─────────────────────────────────────────────
 export interface StockHistory {
   id:        string;
+  productId: string;
   type:      StockAdjustmentType;
   quantity:  number;
   reason?:   string;

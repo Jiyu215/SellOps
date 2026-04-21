@@ -154,11 +154,12 @@ export async function adjustStock(
  * 실제 서비스: GET /api/products/:id/stock/history
  */
 export async function getStockHistory(
-  _id: string,
+  id: string,
   page: number = 1,
   limit: number = 20,
 ): Promise<{ items: StockHistory[]; total: number }> {
+  const filtered = MOCK_STOCK_HISTORY.filter((h) => h.productId === id);
   const start = (page - 1) * limit;
-  const items = MOCK_STOCK_HISTORY.slice(start, start + limit);
-  return { items, total: MOCK_STOCK_HISTORY.length };
+  const items = filtered.slice(start, start + limit);
+  return { items, total: filtered.length };
 }

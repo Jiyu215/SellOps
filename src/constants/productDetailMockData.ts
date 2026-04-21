@@ -52,14 +52,14 @@ export const MOCK_PRODUCT_DETAIL: ProductDetail = {
 // ── 목 재고 이력 ──────────────────────────────────────────────────────────────
 
 export const MOCK_STOCK_HISTORY: StockHistory[] = [
-  { id: 'sh-001', type: 'in',  quantity: 100, reason: '초기 입고',       operator: '김운영', createdAt: _isoAt(180, 14, 30) },
-  { id: 'sh-002', type: 'in',  quantity: 50,  reason: '추가 발주',       operator: '이운영', createdAt: _isoAt(120, 10, 0)  },
-  { id: 'sh-003', type: 'out', quantity: 8,   reason: '파손 처리',       operator: '이운영', createdAt: _isoAt(90, 15, 0)   },
-  { id: 'sh-004', type: 'in',  quantity: 60,  reason: '재고 보충',       operator: '김운영', createdAt: _isoAt(60, 9, 0)    },
-  { id: 'sh-005', type: 'out', quantity: 3,   reason: '샘플 출고',       operator: '박운영', createdAt: _isoAt(45, 11, 30)  },
-  { id: 'sh-006', type: 'in',  quantity: 40,  reason: '추가 입고',       operator: '김운영', createdAt: _isoAt(30, 14, 0)   },
-  { id: 'sh-007', type: 'out', quantity: 5,   reason: '불량 반품 처리',  operator: '이운영', createdAt: _isoAt(15, 10, 0)   },
-  { id: 'sh-008', type: 'in',  quantity: 20,  reason: '긴급 입고',       operator: '김운영', createdAt: _isoAt(10, 16, 0)   },
+  { id: 'sh-001', productId: 'prod-001', type: 'in',  quantity: 100, reason: '초기 입고',       operator: '김운영', createdAt: _isoAt(180, 14, 30) },
+  { id: 'sh-002', productId: 'prod-002', type: 'in',  quantity: 50,  reason: '추가 발주',       operator: '이운영', createdAt: _isoAt(120, 10, 0)  },
+  { id: 'sh-003', productId: 'prod-003', type: 'out', quantity: 8,   reason: '파손 처리',       operator: '이운영', createdAt: _isoAt(90, 15, 0)   },
+  { id: 'sh-004', productId: 'prod-004', type: 'in',  quantity: 60,  reason: '재고 보충',       operator: '김운영', createdAt: _isoAt(60, 9, 0)    },
+  { id: 'sh-005', productId: 'prod-005', type: 'out', quantity: 3,   reason: '샘플 출고',       operator: '박운영', createdAt: _isoAt(45, 11, 30)  },
+  { id: 'sh-006', productId: 'prod-006', type: 'in',  quantity: 40,  reason: '추가 입고',       operator: '김운영', createdAt: _isoAt(30, 14, 0)   },
+  { id: 'sh-007', productId: 'prod-007', type: 'out', quantity: 5,   reason: '불량 반품 처리',  operator: '이운영', createdAt: _isoAt(15, 10, 0)   },
+  { id: 'sh-008', productId: 'prod-008', type: 'in',  quantity: 20,  reason: '긴급 입고',       operator: '김운영', createdAt: _isoAt(10, 16, 0)   },
 ];
 
 // ── Map (서비스 조회용) ───────────────────────────────────────────────────────
