@@ -75,7 +75,12 @@ const STATUS_DESCRIPTIONS: Record<ProductStatus, string> = {
   sold_out: '고객 노출, 구매 불가',
 };
 
-// ── 임시저장 키 생성 ──────────────────────────────────────────────────────────
+/**
+ * Create the localStorage key used for saving a product draft, scoped per user-product.
+ *
+ * @param productId - The product ID to scope the draft; pass `null` for a new (unsaved) product
+ * @returns The draft key string incorporating the `productId` or `'new'` when `productId` is `null`
+ */
 
 function getDraftKey(productId: string | null): string {
   return `sellops_product_draft_user_${productId ?? 'new'}`;
@@ -88,7 +93,15 @@ export interface ProductDetailFormProps {
   isNew:    boolean;
 }
 
-// ── 폼 초기값 ─────────────────────────────────────────────────────────────────
+/**
+ * Builds initial form values for product creation or editing.
+ *
+ * If a `product` is provided, the returned object is populated from that product's fields.
+ * If no `product` is provided, returns empty defaults with `status` set to `'active'`.
+ *
+ * @param product - Optional product to use as the source of initial values
+ * @returns The initial `ProductFormData` for the form
+ */
 
 function getInitialFormData(product?: ProductDetail): ProductFormData {
   if (!product) {
@@ -113,14 +126,24 @@ function getInitialFormData(product?: ProductDetail): ProductFormData {
   };
 }
 
-// ── 파일 크기 포맷 ────────────────────────────────────────────────────────────
+/**
+ * Format a file size given in bytes into a compact human-readable string.
+ *
+ * @param bytes - File size in bytes.
+ * @returns The size formatted as an MB string with one decimal (e.g., `1.2MB`) when at least 1,000,000 bytes, otherwise as a whole-number KB string (e.g., `850KB`).
+ */
 
 function formatFileSize(bytes: number): string {
   if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)}MB`;
   return `${(bytes / 1_000).toFixed(0)}KB`;
 }
 
-// ── 재고 이력 날짜 포맷 ───────────────────────────────────────────────────────
+/**
+ * Format an ISO date/time string as Korea Standard Time in `YYYY.MM.DD HH:mm` form.
+ *
+ * @param iso - An ISO 8601 date/time string (UTC or with timezone offset)
+ * @returns The input timestamp converted to KST (UTC+9) and formatted as `YYYY.MM.DD HH:mm`
+ */
 
 function formatHistoryDate(iso: string): string {
   const d   = new Date(iso);

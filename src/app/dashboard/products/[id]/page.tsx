@@ -11,10 +11,13 @@ interface ProductDetailPageProps {
 }
 
 /**
- * 상품 상세·수정 페이지 (Server Component)
+ * Create the page title metadata for a product detail page.
  *
- * - params는 Next.js 16 비동기 타입으로 await 처리.
- * - 존재하지 않는 상품 ID → notFound() 호출.
+ * Fetches the product by `id` and returns a title using the product name when found,
+ * otherwise returns a default title of "상품 상세".
+ *
+ * @param params - A Promise resolving to an object with the route `id` string
+ * @returns The page title: `${product.name} | SellOps` if the product exists, otherwise `상품 상세`
  */
 export async function generateMetadata({ params }: ProductDetailPageProps) {
   const { id }  = await params;
@@ -24,6 +27,12 @@ export async function generateMetadata({ params }: ProductDetailPageProps) {
   };
 }
 
+/**
+ * Render the product detail page for the provided route params.
+ *
+ * @param params - A promise that resolves to route parameters containing the `id` of the product to load.
+ * @returns The React element for the product detail page. Triggers a 404 response if the product cannot be found.
+ */
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   const { id }  = await params;
   const product = await getProductDetail(id);

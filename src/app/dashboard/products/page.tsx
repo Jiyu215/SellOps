@@ -6,12 +6,13 @@ import { ProductsContent } from './ProductsContent';
 import { ProductsPageSkeleton } from './ProductsPageSkeleton';
 
 /**
- * 상품 관리 페이지 (Server Component)
+ * Server component that renders the product management page.
  *
- * - DashboardLayout: 사이드바 + 헤더 공통 레이아웃
- * - ProductsContent: 클라이언트 컴포넌트 (useSearchParams → Suspense 필요)
- * - MOCK_PRODUCTS를 직접 읽어 initialProducts로 전달 →
- *   saveProductAction + revalidatePath 후 서버 재렌더 시 최신 목록 반영
+ * Renders the dashboard layout and provides a server-side snapshot of product data
+ * to the client-side ProductsContent component; wraps the client content in a
+ * Suspense boundary with a ProductsPageSkeleton fallback.
+ *
+ * @returns The React element for the product management page.
  */
 export default function ProductsPage() {
   // 서버 측 현재 목록 스냅샷 (revalidatePath 로 갱신됨)

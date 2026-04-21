@@ -56,8 +56,11 @@ export async function getProductDetail(id: string): Promise<ProductDetail | null
 // ── 상품코드 중복 확인 ────────────────────────────────────────────────────────
 
 /**
- * 상품코드 중복 확인
- * 실제 서비스: GET /api/products/check-code?code=...&excludeId=...
+ * Determines whether a product code is unused by other products.
+ *
+ * @param code - The product code to check
+ * @param excludeId - Optional product id to exclude from the check
+ * @returns `true` if the code is available, `false` otherwise
  */
 export async function checkProductCode(
   code: string,
@@ -75,8 +78,10 @@ export async function checkProductCode(
 // ── 상품 생성 ─────────────────────────────────────────────────────────────────
 
 /**
- * 상품 생성
- * 실제 서비스: POST /api/products
+ * Create a new product and return its identifier.
+ *
+ * @param _data - Product creation payload (ignored by this mock implementation)
+ * @returns The created product's `id`
  */
 export async function createProduct(
   _data: ProductFormData,
@@ -89,8 +94,12 @@ export async function createProduct(
 // ── 상품 수정 ─────────────────────────────────────────────────────────────────
 
 /**
- * 상품 수정
- * 실제 서비스: PATCH /api/products/:id
+ * Performs a product update (mock implementation that does not change state).
+ *
+ * Mock counterpart to PATCH /api/products/:id; accepts a product id and a partial update payload but performs no persistence.
+ *
+ * @param _id - The id of the product to update (ignored by the mock)
+ * @param _data - Partial product fields to apply (ignored by the mock)
  */
 export async function updateProduct(
   _id: string,
@@ -102,8 +111,15 @@ export async function updateProduct(
 // ── 재고 조정 ─────────────────────────────────────────────────────────────────
 
 /**
- * 재고 조정
- * 실제 서비스: POST /api/products/:id/stock/adjust
+ * Adjusts a product's stock counts and returns the resulting totals.
+ *
+ * @param id - The product identifier whose stock will be adjusted
+ * @param type - Adjustment type: `'in'` to increase stock; any other value decreases available stock
+ * @param quantity - The quantity to add or remove
+ * @param _reason - Optional reason for the adjustment (not used by this mock implementation)
+ * @returns The updated stock totals: `total`, `sold`, and `available`
+ * @throws Error when the product cannot be found
+ * @throws Error when attempting to remove more than the available stock
  */
 export async function adjustStock(
   id: string,
@@ -130,8 +146,14 @@ export async function adjustStock(
 // ── 재고 이력 조회 ────────────────────────────────────────────────────────────
 
 /**
- * 재고 이력 조회
- * 실제 서비스: GET /api/products/:id/stock/history
+ * Retrieves paginated stock history entries.
+ *
+ * The `id` parameter is ignored in this mock implementation; history is not filtered by product.
+ *
+ * @param _id - Product id (unused in mock)
+ * @param page - 1-based page number to return
+ * @param limit - Number of items per page
+ * @returns An object with `items` containing the requested page of `StockHistory` entries and `total` equal to the total number of entries available
  */
 export async function getStockHistory(
   _id: string,

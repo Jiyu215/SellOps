@@ -8,12 +8,14 @@ import type { ProductFormData, ProductDetail, ProductListItem } from '@/types/pr
 // ── 상품 저장 서버 액션 ───────────────────────────────────────────────────────
 
 /**
- * 상품 생성 또는 수정 서버 액션
- * 실제 서비스: POST /api/products (신규) / PATCH /api/products/:id (수정)
+ * Create a new product or update an existing product in the mock store.
  *
- * @param data         - 폼 데이터
- * @param id           - 수정 시 상품 ID (없으면 신규 생성)
- * @param initialStock - 신규 등록 시 초기 재고 (폼에서 미리 조정한 값)
+ * When `id` is provided the existing product is updated; when `id` is omitted a new product and corresponding list item are created.
+ *
+ * @param data - Product form data used to create or update the product
+ * @param id - Product ID to update; omit to create a new product
+ * @param initialStock - Initial stock values to apply when creating a new product
+ * @returns The product `id` and the created or updated `ProductDetail` when available
  */
 export async function saveProductAction(
   data: ProductFormData,

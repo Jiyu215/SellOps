@@ -9,10 +9,12 @@ export const metadata = {
 };
 
 /**
- * 상품 신규 등록 페이지 (Server Component)
+ * Render the dashboard page for registering a new product.
  *
- * - product prop 없음 → isNew=true
- * - ProductDetailForm이 클라이언트 컴포넌트이므로 Suspense로 감쌈.
+ * Renders DashboardLayout populated with mock user and notification data and
+ * includes a Suspense-wrapped ProductDetailForm configured for a new-product flow.
+ *
+ * @returns The page UI for new product registration, with ProductDetailForm rendered with `isNew={true}` and `ProductDetailSkeleton` as the Suspense fallback.
  */
 export default function ProductNewPage() {
   return (
