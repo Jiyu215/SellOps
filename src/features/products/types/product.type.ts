@@ -48,3 +48,67 @@ export type ProductListResponse = {
     sold_out: number
   }
 }
+
+export type ImageType = 'main' | 'list' | 'small' | 'thumbnail' | 'extra'
+export type ImageFormat = 'jpg' | 'png' | 'gif' | 'webp'
+
+export type ProductImage = {
+  id: string
+  product_id: string
+  type: ImageType
+  url: string
+  width: number | null
+  height: number | null
+  size_mb: number | null
+  format: ImageFormat | null
+  order: number
+}
+
+export type Stock = {
+  product_id: string
+  total: number
+  sold: number
+  available: number   // 뷰에서 total - sold 계산값
+}
+
+export type StockHistory = {
+  product_id: string
+  type: 'in' | 'out'
+  quantity: number
+  reason: string | null
+  created_at: string
+}
+
+export type ProductDetail = {
+  id: string
+  name: string
+  price: number
+  product_code: string
+  summary: string
+  short_description: string | null
+  description: string
+  status: ProductStatus
+  created_at: string
+  updated_at: string
+  // 조인 데이터
+  stock: Stock
+  images: ProductImage[]
+}
+
+export type ProductCreateBody = {
+  name: string
+  price: number
+  product_code: string
+  summary: string
+  short_description?: string
+  description: string
+  status: ProductStatus
+}
+
+export type ProductUpdateBody = Partial<ProductCreateBody>
+
+export type StockAdjustBody = {
+  type: 'in' | 'out'
+  quantity: number
+  reason?: string
+}
