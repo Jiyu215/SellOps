@@ -11,6 +11,8 @@ interface DashboardLayoutProps {
   currentUser: UserProfile;
   pageTitle?: string;
   notifications?: Notification[];
+  /** true이면 내부 overflow-y-auto 스크롤을 제거하고 브라우저 네이티브 스크롤 사용 */
+  nativeScroll?: boolean;
 }
 
 /**
@@ -27,6 +29,7 @@ export const DashboardLayout = ({
   currentUser,
   pageTitle = '대시보드',
   notifications: initialNotifications = [],
+  nativeScroll = false,
 }: DashboardLayoutProps) => {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -49,6 +52,40 @@ export const DashboardLayout = ({
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/auth/login');
   }, [router]);
+
+  if (nativeScroll) {
+    return (
+      /* nativeScroll: 브라우저 기본 스크롤 사용, 사이드바만 sticky 고정 */
+      <div className="min-h-screen bg-light-background dark:bg-dark-background flex">
+        {/* 사이드바: sticky로 스크롤 시에도 뷰포트 좌측에 고정 */}
+        <div className="sticky top-0 self-start h-screen shrink-0 overflow-hidden w-0 md:w-16 xl:w-[190px]">
+          <Sidebar
+            currentUser={currentUser}
+            mobileOpen={mobileOpen}
+            onMobileClose={() => setMobileOpen(false)}
+            onLogout={handleLogout}
+          />
+        </div>
+
+        {/* 메인 영역: 내용 길이에 따라 자유롭게 확장 */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <Header
+            currentUser={currentUser}
+            pageTitle={pageTitle}
+            notifications={notifications}
+            onMarkRead={handleMarkRead}
+            onMarkAllRead={handleMarkAllRead}
+            mobileMenuOpen={mobileOpen}
+            onMobileMenuToggle={() => setMobileOpen((prev) => !prev)}
+          />
+
+          <main className="p-sm md:p-md xl:p-lg">
+            {children}
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     /* h-screen: 사이드바·헤더 고정, 메인 영역만 수직 스크롤 */

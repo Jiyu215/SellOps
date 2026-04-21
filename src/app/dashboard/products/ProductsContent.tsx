@@ -5,14 +5,24 @@ import { ProductTable } from '@/components/dashboard/products';
 import { MOCK_PRODUCTS } from '@/constants/productsMockData';
 import type { ProductListItem, ProductStatus } from '@/types/products';
 
+interface ProductsContentProps {
+  /** 서버에서 전달된 최신 상품 목록 (없으면 클라이언트 목 사용) */
+  initialProducts?: ProductListItem[];
+}
+
 /**
  * 상품 관리 페이지 콘텐츠 (Client Component)
  *
  * useSearchParams(useProductFilter 내부)를 사용하므로 Suspense 바운더리 필요.
  * 실제 서비스에서는 서버 액션 또는 React Query로 데이터를 패칭한다.
+ *
+ * initialProducts: ProductsPage (Server Component)가 서버 측 최신 목록을 주입.
+ * 이를 통해 saveProductAction 후 revalidatePath 로 갱신된 목록이 즉시 반영된다.
  */
-export const ProductsContent = () => {
-  const [products, setProducts] = useState<ProductListItem[]>(MOCK_PRODUCTS);
+export const ProductsContent = ({ initialProducts }: ProductsContentProps) => {
+  const [products, setProducts] = useState<ProductListItem[]>(
+    () => initialProducts ?? [...MOCK_PRODUCTS],
+  );
   const [exportLoading, setExportLoading] = useState(false);
 
   const handleBulkStatusChange = useCallback(
