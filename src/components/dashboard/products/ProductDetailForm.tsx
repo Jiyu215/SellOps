@@ -772,6 +772,11 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
   const handleTypedImageSelect = useCallback((file: File, imageType: Exclude<ImageType, 'extra'>) => {
     const err = validateImageFile(file);
     if (err) { showToast(err, 'error'); return; }
+
+    // 기존 로컬 URL 정리
+    const prev = typedImages[imageType];
+    if (prev?.url.startsWith('blob:')) URL.revokeObjectURL(prev.url);
+
     const url = URL.createObjectURL(file);
     const img: ProductImage = {
       id:        `local-${imageType}-${Date.now()}`,
@@ -786,6 +791,9 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
 
   const handleTypedImageRemove = useCallback((imageType: Exclude<ImageType, 'extra'>) => {
     setTypedImages((prev) => {
+      const target = prev[imageType];
+      if (target?.url.startsWith('blob:')) URL.revokeObjectURL(target.url);
+
       const next = { ...prev };
       delete next[imageType];
       return next;
@@ -825,7 +833,11 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
   }, [handleExtraFilesSelect]);
 
   const handleExtraImageRemove = useCallback((id: string) => {
-    setExtraImages((prev) => prev.filter((img) => img.id !== id));
+    setExtraImages((prev) => {
+      const target = prev.find((img) => img.id === id);
+      if (target?.url.startsWith('blob:')) URL.revokeObjectURL(target.url);
+      return prev.filter((img) => img.id !== id);
+    });
   }, []);
 
   // ── 추가 이미지 순서 변경 (드래그) ───────────────────────
@@ -924,9 +936,23 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
   const priceDisplay = formData.price === '' ? '' : String(formData.price);
 
   // ── 클린업 ───────────────────────────────────────────────
+  const typedImagesRef = useRef(typedImages);
+  const extraImagesRef = useRef(extraImages);
+
+  useEffect(() => { typedImagesRef.current = typedImages; }, [typedImages]);
+  useEffect(() => { extraImagesRef.current = extraImages; }, [extraImages]);
+
   useEffect(() => {
     return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      // 규격 이미지 정리
+      Object.values(typedImages).forEach((img) => {
+        if (img?.url.startsWith('blob:')) URL.revokeObjectURL(img.url);
+      });
+
+      // 추가 이미지 정리
+      extraImages.forEach((img) => {
+        if (img.url.startsWith('blob:')) URL.revokeObjectURL(img.url);
+      });
     };
   }, []);
 
