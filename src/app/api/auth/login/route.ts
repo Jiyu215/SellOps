@@ -1,54 +1,88 @@
-import { NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
+import type { Database } from '@/types/supabase'
 
-// 목업 관리자 계정 (추후 DB 검증으로 교체)
-const MOCK_ADMIN = {
-  id: 'u-001',
-  name: '김운영자',
-  email: 'admin@sellops.com',
-  role: '슈퍼 어드민',
-  password: 'Admin1234!',
-};
+const MAX_AGE = 60 * 60 * 24 * 30
 
-const AUTH_COOKIE = 'sellops-auth-token';
-/** 쿠키 유효 기간: 30일 */
-const MAX_AGE = 60 * 60 * 24 * 30;
-
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as { email: string; password: string };
-    const { email, password } = body;
-
-    if (email !== MOCK_ADMIN.email || password !== MOCK_ADMIN.password) {
-      return NextResponse.json(
-        { success: false, data: null, error: '이메일 또는 비밀번호가 올바르지 않습니다.' },
-        { status: 401 },
-      );
+    const { email, password } = await request.json() as {
+      email: string
+      password: string
     }
 
+    /**
+     * Next.js 15+에서 Route Handler 내 cookies() from next/headers는 읽기 전용이다.
+     * supabase.auth.signInWithPassword()가 세션 쿠키를 기록하려 할 때
+     * cookieStore.set()을 호출하면 예외가 발생해 500이 된다.
+     *
+     * 해결: request.cookies로 읽고, setAll에서 쿠키를 버퍼에 모은 뒤
+     *       NextResponse 생성 후 response.cookies에 일괄 적용한다.
+     */
+    type SetArgs = Parameters<typeof response.cookies.set>
+    const pendingCookies: SetArgs[] = []
+
+    const supabase = createServerClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll: () => request.cookies.getAll(),
+          setAll: (cookiesToSet) => {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              pendingCookies.push([name, value, options])
+            )
+          },
+        },
+      }
+    )
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error || !data.user) {
+      return NextResponse.json(
+        { success: false, data: null, error: '이메일 또는 비밀번호가 올바르지 않습니다.' },
+        { status: 401 }
+      )
+    }
+
+    // profiles 테이블에서 추가 정보 조회 (실패해도 기본값 사용)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('name')
+      .eq('id', data.user.id)
+      .maybeSingle<{ name: string | null }>()
+
     const user = {
-      id: MOCK_ADMIN.id,
-      name: MOCK_ADMIN.name,
-      email: MOCK_ADMIN.email,
-      role: MOCK_ADMIN.role,
-    };
+      id:    data.user.id,
+      email: data.user.email ?? '',
+      name:  profile?.name ?? data.user.user_metadata?.name ?? '운영자',
+    }
 
-    // 토큰: base64 인코딩 (추후 JWT로 교체)
-    const token = Buffer.from(JSON.stringify(user)).toString('base64');
+    const response = NextResponse.json({ success: true, data: user, error: null })
 
-    const response = NextResponse.json({ success: true, data: user, error: null });
-    response.cookies.set(AUTH_COOKIE, token, {
+    // Supabase 세션 쿠키를 응답에 적용
+    pendingCookies.forEach((args) => response.cookies.set(...args))
+
+    // 호환성 토큰 (btoa는 Latin-1만 지원하므로 Buffer 사용)
+    const token = Buffer.from(JSON.stringify(user)).toString('base64')
+    response.cookies.set('sellops-auth-token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure:   process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: MAX_AGE,
-      path: '/',
-    });
+      maxAge:   MAX_AGE,
+      path:     '/',
+    })
 
-    return response;
-  } catch {
+    return response
+  } catch (err) {
+    console.error('LOGIN API ERROR:', err)
     return NextResponse.json(
       { success: false, data: null, error: '서버 오류가 발생했습니다.' },
-      { status: 500 },
-    );
+      { status: 500 }
+    )
   }
 }

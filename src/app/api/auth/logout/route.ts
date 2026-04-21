@@ -1,9 +1,14 @@
-import { NextResponse } from 'next/server';
-
-const AUTH_COOKIE = 'sellops-auth-token';
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
 
 export async function POST() {
-  const response = NextResponse.json({ success: true, data: null, error: null });
-  response.cookies.delete(AUTH_COOKIE);
-  return response;
+  const supabase = await createClient()
+
+  await supabase.auth.signOut()
+
+  return NextResponse.json({
+    success: true,
+    data: null,
+    error: null,
+  })
 }
