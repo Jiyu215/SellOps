@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import type { ProductStatus } from '@/features/products/types/product.type'
 
@@ -8,9 +8,7 @@ export async function GET(request: Request) {
     const search = searchParams.get('search') ?? ''
     const status = searchParams.get('status') as ProductStatus | ''
 
-    const supabase = await createClient()
-
-    let query = supabase
+    let query = supabaseAdmin
       .from('products_with_stock')
       .select('product_code, name, price, stock_total, stock_sold, stock_available, status, created_at, updated_at')
       .order('created_at', { ascending: false })

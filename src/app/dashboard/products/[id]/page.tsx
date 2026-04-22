@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { MOCK_USER, MOCK_NOTIFICATIONS } from '@/constants/mockData';
-import { getProductDetail } from '@/services/productDetailService';
+import { getProductById } from '@/dal/products';
 import { ProductDetailContent } from './ProductDetailContent';
 import { ProductDetailSkeleton } from './ProductDetailSkeleton';
 
@@ -18,7 +18,7 @@ interface ProductDetailPageProps {
  */
 export async function generateMetadata({ params }: ProductDetailPageProps) {
   const { id }  = await params;
-  const product = await getProductDetail(id);
+  const product = await getProductById(id);
   return {
     title: product ? `${product.name} | SellOps` : '상품 상세',
   };
@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: ProductDetailPageProps) {
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   const { id }  = await params;
-  const product = await getProductDetail(id);
+  const product = await getProductById(id);
 
   if (!product) notFound();
 

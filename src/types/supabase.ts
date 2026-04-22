@@ -304,7 +304,10 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      delete_products: {
+        Args: { product_ids: string[] }
+        Returns: void
+      }
     }
     Enums: {
       [_ in never]: never

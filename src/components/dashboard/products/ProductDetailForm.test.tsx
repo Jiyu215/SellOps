@@ -598,7 +598,7 @@ describe('재고 관리', () => {
     await waitFor(() => {
       // 입고 50 → 전체 입고 50, 가용 재고 50 (두 셀 모두 '50' 표시)
       expect(screen.getAllByText('50').length).toBeGreaterThanOrEqual(2);
-      expect(screen.getByText('재고가 조정되었습니다.')).toBeInTheDocument();
+      expect(screen.getByText('재고가 반영되었습니다. 저장 시 적용됩니다.')).toBeInTheDocument();
     });
   });
 
@@ -608,14 +608,14 @@ describe('재고 관리', () => {
     expect(outRadio).toBeDisabled();
   });
 
-  test('입고 조정 성공 시 재고 갱신 토스트 표시', async () => {
+  test('입고 조정 시 대기 중 토스트 표시', async () => {
     render(<ProductDetailForm product={MOCK_PRODUCT} isNew={false} />);
     const qtyInput = screen.getByLabelText('수량');
     await userEvent.type(qtyInput, '10');
     const applyBtn = screen.getByRole('button', { name: '재고 조정 적용' });
     fireEvent.click(applyBtn);
     await waitFor(() => {
-      expect(screen.getByText('재고가 조정되었습니다.')).toBeInTheDocument();
+      expect(screen.getByText('재고 조정이 대기 중입니다. 저장하기를 눌러 적용하세요.')).toBeInTheDocument();
     });
   });
 

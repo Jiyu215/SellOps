@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import type { ProductStatus } from '@/features/products/types/product.type'
 
@@ -16,8 +16,7 @@ export async function PATCH(request: Request) {
       )
     }
 
-    const supabase = await createClient()
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('products')
       .update({ status, updated_at: new Date().toISOString() })
       .in('id', ids)

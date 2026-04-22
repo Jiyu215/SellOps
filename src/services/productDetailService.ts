@@ -1,165 +1,122 @@
 import {
-  MOCK_PRODUCT_DETAIL_MAP,
-  MOCK_STOCK_HISTORY,
-} from '@/constants/productDetailMockData';
-import { MOCK_PRODUCTS } from '@/constants/productsMockData';
+  checkProductCode as apiCheckProductCode,
+  adjustStock as apiAdjustStock,
+  fetchStockHistory,
+  createProduct as apiCreateProduct,
+  updateProduct as apiUpdateProduct,
+} from '@/features/products/api/productDetail.api';
 import type {
-  ProductDetail,
-  ProductFormData,
+  StockHistory as ApiStockHistory,
+} from '@/features/products/types/product.type';
+import type {
   StockHistory,
   StockAdjustmentType,
+  ProductFormData,
 } from '@/types/products';
 
-// ── 상품 상세 조회 ────────────────────────────────────────────────────────────
+// ── 타입 매핑 헬퍼 ────────────────────────────────────────────────────────────
 
-/**
- * 상품 상세 조회
- * 실제 서비스: GET /api/products/:id
- *
- * 상세 데이터가 없는 경우 목록 데이터를 기반으로 기본 상세 정보를 생성하여 반환한다.
- * 이를 통해 목록의 모든 상품이 상세 페이지로 진입 가능하다.
- */
-export async function getProductDetail(id: string): Promise<ProductDetail | null> {
-  const detail = MOCK_PRODUCT_DETAIL_MAP.get(id);
-  if (detail) return detail;
-
-  // 목록 데이터로 기본 상세 정보 생성 (폴백)
-  const listItem = MOCK_PRODUCTS.find((p) => p.id === id);
-  if (!listItem) return null;
-
-  const generated: ProductDetail = {
-    id:               listItem.id,
-    productCode:      listItem.productCode,
-    name:             listItem.name,
-    category:         listItem.category,
-    price:            listItem.price,
-    summary:          '',
-    shortDescription: '',
-    description:      '',
-    status:           listItem.status,
-    stock: {
-      total:     listItem.totalStock,
-      sold:      listItem.soldCount,
-      available: listItem.availableStock,
-    },
-    images:    [],
-    createdAt: listItem.createdAt,
-    updatedAt: listItem.updatedAt,
-    createdBy: '관리자',
+function mapStockHistory(h: ApiStockHistory, index: number): StockHistory {
+  return {
+    id:        `${h.product_id}_${h.created_at}_${index}`,
+    productId: h.product_id,
+    type:      h.type,
+    quantity:  h.quantity,
+    reason:    h.reason ?? undefined,
+    operator:  '-',
+    createdAt: h.created_at,
   };
-
-  // 이후 조회 시 캐싱
-  MOCK_PRODUCT_DETAIL_MAP.set(id, generated);
-  return generated;
 }
 
 // ── 상품코드 중복 확인 ────────────────────────────────────────────────────────
 
 /**
  * 상품코드 중복 확인
- * 실제 서비스: GET /api/products/check-code?code=...&excludeId=...
+ * GET /api/products/check-code?code=...&excludeId=...
  */
 export async function checkProductCode(
   code: string,
   excludeId?: string,
 ): Promise<{ available: boolean }> {
-  // Mock: prod-001의 코드인 KB-MXS-BLK은 이미 사용 중 (자기 자신 수정 시엔 제외)
-  const usedCodes = new Set([
-    ...MOCK_PRODUCTS
-      .filter((p) => p.id !== excludeId)
-      .map((p) => p.productCode),
-    ...[...MOCK_PRODUCT_DETAIL_MAP.values()]
-      .filter((p) => p.id !== excludeId)
-      .map((p) => p.productCode),
-  ]);
-  return { available: !usedCodes.has(code) };
+  const available = await apiCheckProductCode(code, excludeId);
+  return { available };
 }
 
 // ── 상품 생성 ─────────────────────────────────────────────────────────────────
 
 /**
  * 상품 생성
- * 실제 서비스: POST /api/products
+ * POST /api/products
  */
 export async function createProduct(
-  _data: ProductFormData,
+  data: ProductFormData,
 ): Promise<{ id: string }> {
-  // Mock: 고정 ID 반환
-  const newId = `prod-${Date.now()}`;
-  return { id: newId };
+  return apiCreateProduct({
+    name:              data.name,
+    price:             typeof data.price === 'number' ? data.price : 0,
+    product_code:      data.productCode,
+    summary:           data.summary,
+    short_description: data.shortDescription,
+    description:       data.description,
+    status:            data.status,
+  });
 }
 
 // ── 상품 수정 ─────────────────────────────────────────────────────────────────
 
 /**
  * 상품 수정
- * 실제 서비스: PATCH /api/products/:id
+ * PATCH /api/products/:id
  */
 export async function updateProduct(
-  _id: string,
-  _data: Partial<ProductFormData>,
+  id: string,
+  data: Partial<ProductFormData>,
 ): Promise<void> {
-  // Mock: no-op
+  await apiUpdateProduct(id, {
+    ...(data.name !== undefined             && { name: data.name }),
+    ...(typeof data.price === 'number'      && { price: data.price }),
+    ...(data.productCode !== undefined      && { product_code: data.productCode }),
+    ...(data.summary !== undefined          && { summary: data.summary }),
+    ...(data.shortDescription !== undefined && { short_description: data.shortDescription }),
+    ...(data.description !== undefined      && { description: data.description }),
+    ...(data.status !== undefined           && { status: data.status }),
+  });
 }
 
 // ── 재고 조정 ─────────────────────────────────────────────────────────────────
 
 /**
  * 재고 조정
- * 실제 서비스: POST /api/products/:id/stock/adjust
+ * POST /api/products/:id/stock/adjust
  */
 export async function adjustStock(
   id: string,
   type: StockAdjustmentType,
   quantity: number,
-  _reason?: string,
+  reason?: string,
 ): Promise<{ total: number; sold: number; available: number }> {
-  const product = MOCK_PRODUCT_DETAIL_MAP.get(id);
-  if (!product) throw new Error('상품을 찾을 수 없습니다.');
-
-  const next = { ...product.stock };
-  if (type === 'in') {
-    next.total     += quantity;
-    next.available += quantity;
-  } else {
-    if (quantity > next.available) {
-      throw new Error('가용 재고보다 많은 수량입니다.');
-    }
-    next.available -= quantity;
-  }
-
-  MOCK_PRODUCT_DETAIL_MAP.set(id, {
-    ...product,
-    stock: next,
-    updatedAt: new Date().toISOString(),
-  });
-
-  const listIdx = MOCK_PRODUCTS.findIndex((p) => p.id === id);
-  if (listIdx >= 0) {
-    MOCK_PRODUCTS[listIdx] = {
-      ...MOCK_PRODUCTS[listIdx],
-      totalStock: next.total,
-      availableStock: next.available,
-      soldCount: next.sold,
-      updatedAt: new Date().toISOString(),
-    };
-  }
-  return next;
+  const result = await apiAdjustStock(id, { type, quantity, reason });
+  return {
+    total:     result.total,
+    sold:      result.sold,
+    available: result.available,
+  };
 }
 
 // ── 재고 이력 조회 ────────────────────────────────────────────────────────────
 
 /**
  * 재고 이력 조회
- * 실제 서비스: GET /api/products/:id/stock/history
+ * GET /api/products/:id/stock/history
  */
 export async function getStockHistory(
   id: string,
   page: number = 1,
   limit: number = 20,
 ): Promise<{ items: StockHistory[]; total: number }> {
-  const filtered = MOCK_STOCK_HISTORY.filter((h) => h.productId === id);
-  const start = (page - 1) * limit;
-  const items = filtered.slice(start, start + limit);
-  return { items, total: filtered.length };
+  const result = await fetchStockHistory(id, page, limit);
+  return {
+    items: result.items.map((h, i) => mapStockHistory(h, i)),
+    total: result.total,
+  };
 }

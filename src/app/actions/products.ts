@@ -1,15 +1,15 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { MOCK_PRODUCT_DETAIL_MAP } from '@/constants/productDetailMockData';
-import { MOCK_PRODUCTS } from '@/constants/productsMockData';
-import type { ProductFormData, ProductDetail, ProductListItem } from '@/types/products';
+import { supabaseAdmin } from '@/lib/supabase/admin';
+import type { ProductFormData, ProductDetail, ProductStatus } from '@/types/products';
 
 // ── 상품 저장 서버 액션 ───────────────────────────────────────────────────────
 
 /**
  * 상품 생성 또는 수정 서버 액션
- * 실제 서비스: POST /api/products (신규) / PATCH /api/products/:id (수정)
+ * 신규: Supabase admin 클라이언트로 직접 처리
+ * 수정: Supabase admin 클라이언트로 직접 처리
  *
  * @param data         - 폼 데이터
  * @param id           - 수정 시 상품 ID (없으면 신규 생성)
@@ -24,77 +24,80 @@ export async function saveProductAction(
 
   if (id) {
     // ── 수정 ──────────────────────────────────────────────────────────────────
-    const existing = MOCK_PRODUCT_DETAIL_MAP.get(id);
-    if (!existing) throw new Error('상품을 찾을 수 없습니다.');
+    const { error } = await supabaseAdmin
+      .from('products')
+      .update({
+        name:              data.name,
+        ...(typeof data.price === 'number' && { price: data.price }),
+        product_code:      data.productCode,
+        summary:           data.summary,
+        short_description: data.shortDescription,
+        description:       data.description,
+        status:            data.status,
+        updated_at:        now,
+      })
+      .eq('id', id);
 
-    const updated: ProductDetail = {
-      ...existing,
-      name:             data.name,
-      productCode:      data.productCode,
-      price:            typeof data.price === 'number' ? data.price : existing.price,
-      summary:          data.summary,
-      shortDescription: data.shortDescription,
-      description:      data.description,
-      status:           data.status,
-      updatedAt:        now,
-    };
-    MOCK_PRODUCT_DETAIL_MAP.set(id, updated);
-
-    // 목록 아이템도 동기화
-    const listIdx = MOCK_PRODUCTS.findIndex((p) => p.id === id);
-    if (listIdx >= 0) {
-      MOCK_PRODUCTS[listIdx] = {
-        ...MOCK_PRODUCTS[listIdx],
-        name:        data.name,
-        productCode: data.productCode,
-        price:       typeof data.price === 'number' ? data.price : MOCK_PRODUCTS[listIdx].price,
-        status:      data.status,
-        updatedAt:   now,
-      };
-    }
+    if (error) throw new Error('상품 수정에 실패했습니다.');
 
     revalidatePath(`/dashboard/products/${id}`);
     revalidatePath('/dashboard/products');
-    return { id, product: updated };
+    return { id };
   }
 
   // ── 신규 생성 ──────────────────────────────────────────────────────────────
-  const newId = `prod-${Date.now()}`;
+  const { data: newRow, error: createError } = await supabaseAdmin
+    .from('products')
+    .insert({
+      name:              data.name,
+      price:             typeof data.price === 'number' ? data.price : 0,
+      product_code:      data.productCode,
+      summary:           data.summary,
+      short_description: data.shortDescription,
+      description:       data.description,
+      status:            data.status,
+    })
+    .select()
+    .single();
+
+  if (createError || !newRow) throw new Error('상품 등록에 실패했습니다.');
+
+  // stocks 레코드 생성
+  const stockTotal = initialStock?.total ?? 0;
+  await supabaseAdmin
+    .from('stocks')
+    .upsert(
+      { product_id: newRow.id, total: stockTotal, sold: 0 },
+      { onConflict: 'product_id' },
+    );
+
+  // 초기 재고가 있으면 stock_histories에 입고 이력 기록
+  if (stockTotal > 0) {
+    await supabaseAdmin.from('stock_histories').insert({
+      product_id: newRow.id,
+      type:       'in',
+      quantity:   stockTotal,
+      reason:     '초기 입고',
+    });
+  }
 
   const newDetail: ProductDetail = {
-    id:               newId,
-    productCode:      data.productCode,
-    name:             data.name,
-    category:         '미분류',
-    price:            typeof data.price === 'number' ? data.price : 0,
-    summary:          data.summary,
-    shortDescription: data.shortDescription,
-    description:      data.description,
-    status:           data.status,
+    id:               newRow.id,
+    productCode:      newRow.product_code,
+    name:             newRow.name,
+    category:         '',
+    price:            newRow.price,
+    summary:          newRow.summary,
+    shortDescription: newRow.short_description ?? '',
+    description:      newRow.description,
+    status:           newRow.status as ProductStatus,
     stock:            initialStock ?? { total: 0, sold: 0, available: 0 },
     images:           [],
-    createdAt:        now,
-    updatedAt:        now,
-    createdBy:        '관리자',
+    createdAt:        newRow.created_at ?? now,
+    updatedAt:        newRow.updated_at ?? now,
+    createdBy:        '-',
   };
-  MOCK_PRODUCT_DETAIL_MAP.set(newId, newDetail);
-
-  const newListItem: ProductListItem = {
-    id:             newId,
-    productCode:    data.productCode,
-    name:           data.name,
-    category:       '미분류',
-    price:          typeof data.price === 'number' ? data.price : 0,
-    totalStock:     initialStock?.total ?? 0,
-    availableStock: initialStock?.available ?? 0,
-    soldCount:      initialStock?.sold ?? 0,
-    status:         data.status,
-    thumbnailUrl:   undefined,
-    createdAt:      now,
-    updatedAt:      now,
-  };
-  MOCK_PRODUCTS.unshift(newListItem);
 
   revalidatePath('/dashboard/products');
-  return { id: newId, product: newDetail };
+  return { id: newRow.id, product: newDetail };
 }

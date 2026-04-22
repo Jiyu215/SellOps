@@ -1,6 +1,8 @@
+import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import type { ProductStatus, SortOption } from '@/features/products/types/product.type'
+import type { ProductCreateBody, ProductStatus, SortOption } from '@/features/products/types/product.type'
+
 
 export async function GET(request: Request) {
   try {
@@ -53,7 +55,7 @@ export async function GET(request: Request) {
     if (error) throw error
 
     // 상태별 집계 (필터 무관 전체 기준)
-    const { data: summaryData } = await supabase
+    const { data: summaryData } = await supabaseAdmin
       .from('products')
       .select('status')
 
@@ -64,17 +66,23 @@ export async function GET(request: Request) {
       sold_out: summaryData?.filter(p => p.status === 'sold_out').length ?? 0,
     }
 
-    // 목록 이미지 URL 조회 (type='list')
+    // 목록 이미지 URL 조회 (우선순위: list→thumbnail→small→main)
+    const IMAGE_TYPE_PRIORITY = ['list', 'thumbnail', 'small', 'main'] as const
     const ids = (items ?? []).map(p => p.id).filter((id): id is string => id !== null)
-    const { data: images } = await supabase
+    const { data: images } = await supabaseAdmin
       .from('product_images')
-      .select('product_id, url')
+      .select('product_id, type, url')
       .in('product_id', ids)
-      .eq('type', 'list')
+      .in('type', IMAGE_TYPE_PRIORITY)
 
-    const imageMap = Object.fromEntries(
-      (images ?? []).map(img => [img.product_id, img.url])
-    )
+    const imageMap: Record<string, string> = {}
+    for (const priority of IMAGE_TYPE_PRIORITY) {
+      for (const img of images ?? []) {
+        if (img.type === priority && img.product_id && !(img.product_id in imageMap)) {
+          imageMap[img.product_id] = img.url
+        }
+      }
+    }
 
     const result = (items ?? []).map(item => ({
       ...item,
@@ -91,6 +99,48 @@ export async function GET(request: Request) {
   } catch {
     return NextResponse.json(
       { error: '상품 목록 조회에 실패했습니다.' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json() as ProductCreateBody
+
+    const { data, error } = await supabaseAdmin
+      .from('products')
+      .insert({
+        name:              body.name,
+        price:             body.price,
+        product_code:      body.product_code,
+        summary:           body.summary,
+        short_description: body.short_description ?? null,
+        description:       body.description,
+        status:            body.status,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      if (error.code === '23505') {
+        return NextResponse.json(
+          { error: '이미 사용 중인 상품코드입니다.' },
+          { status: 409 }
+        )
+      }
+      throw error
+    }
+
+    // stocks 레코드 생성 (트리거 없을 경우 직접 처리)
+    await supabaseAdmin
+      .from('stocks')
+      .upsert({ product_id: data.id, total: 0, sold: 0 }, { onConflict: 'product_id' })
+
+    return NextResponse.json(data, { status: 201 })
+  } catch {
+    return NextResponse.json(
+      { error: '상품 등록에 실패했습니다.' },
       { status: 500 }
     )
   }

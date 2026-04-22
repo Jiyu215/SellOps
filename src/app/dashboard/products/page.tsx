@@ -4,6 +4,7 @@ import { MOCK_USER, MOCK_NOTIFICATIONS } from '@/constants/mockData';
 import { ProductsContent } from './ProductsContent';
 import { ProductsPageSkeleton } from './ProductsPageSkeleton';
 import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import type { ProductListItem, ProductStatus } from '@/types/products';
 
 /**
@@ -22,17 +23,25 @@ export default async function ProductsPage() {
 
   const ids = (items ?? []).map(p => p.id).filter((id): id is string => id !== null);
 
+  const IMAGE_TYPE_PRIORITY = ['list', 'thumbnail', 'small', 'main'] as const;
+
   const { data: images } = ids.length
-    ? await supabase
+    ? await supabaseAdmin
         .from('product_images')
-        .select('product_id, url')
+        .select('product_id, type, url')
         .in('product_id', ids)
-        .eq('type', 'list')
+        .in('type', IMAGE_TYPE_PRIORITY)
     : { data: [] };
 
-  const imageMap = Object.fromEntries(
-    (images ?? []).map(img => [img.product_id, img.url])
-  );
+  // 상품별로 우선순위(list→thumbnail→small→main) 중 첫 번째 이미지 선택
+  const imageMap: Record<string, string> = {};
+  for (const priority of IMAGE_TYPE_PRIORITY) {
+    for (const img of images ?? []) {
+      if (img.type === priority && img.product_id && !(img.product_id in imageMap)) {
+        imageMap[img.product_id] = img.url;
+      }
+    }
+  }
 
   const initialProducts: ProductListItem[] = (items ?? []).map(item => ({
     id: item.id ?? '',
