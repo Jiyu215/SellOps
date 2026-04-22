@@ -3,6 +3,21 @@ import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/requireAuth'
 import { stockAdjustSchema } from '@/features/products/schemas/product.schema'
 
+type AdjustStockOk = {
+  product_id: string
+  total:      number
+  sold:       number
+  available:  number
+}
+
+type AdjustStockErr =
+  | { error: 'stock_not_found' }
+  | { error: 'product_not_found' }
+  | { error: 'insufficient_stock'; available: number }
+  | { error: 'invalid_stock_adjustment' }
+
+type AdjustRpcResult = AdjustStockOk | AdjustStockErr
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -25,61 +40,48 @@ export async function POST(
     const { type, quantity, reason } = parsed.data
     const supabaseAdmin = getSupabaseAdmin()
 
-    // 현재 재고 조회
-    const { data: stock, error: fetchError } = await supabaseAdmin
-      .from('stocks')
-      .select('total, sold')
-      .eq('product_id', id)
-      .single()
+    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc(
+      'adjust_product_stock',
+      {
+        p_product_id: id,
+        p_type:       type,
+        p_quantity:   quantity,
+        p_reason:     reason ?? null,
+      }
+    )
 
-    if (fetchError || !stock) {
-      return NextResponse.json(
-        { error: '재고 정보를 찾을 수 없습니다.' },
-        { status: 404 }
-      )
+    if (rpcError) throw rpcError
+
+    const result = rpcData as unknown as AdjustRpcResult
+
+    if ('error' in result) {
+      if (result.error === 'product_not_found') {
+        return NextResponse.json(
+          { error: '상품을 찾을 수 없습니다.' },
+          { status: 404 }
+        )
+      }
+      if (result.error === 'stock_not_found') {
+        return NextResponse.json(
+          { error: '재고 정보를 찾을 수 없습니다.' },
+          { status: 404 }
+        )
+      }
+      if (result.error === 'insufficient_stock') {
+        return NextResponse.json(
+          { error: `가용 재고보다 많은 수량입니다. (가용: ${result.available}개)` },
+          { status: 400 }
+        )
+      }
+      if (result.error === 'invalid_stock_adjustment') {
+        return NextResponse.json(
+          { error: '요청 데이터가 올바르지 않습니다.' },
+          { status: 400 }
+        )
+      }
     }
 
-    const available = stock.total - stock.sold
-
-    // 출고 수량 검증
-    if (type === 'out' && quantity > available) {
-      return NextResponse.json(
-        { error: `가용 재고보다 많은 수량입니다. (가용: ${available}개)` },
-        { status: 400 }
-      )
-    }
-
-    // 재고 업데이트
-    // 입고: total 증가 / 출고: total 감소 (가용재고 = total - sold 이므로 total이 실제 변해야 함)
-    const newTotal = type === 'in'
-      ? stock.total + quantity
-      : stock.total - quantity
-
-    const { error: updateError } = await supabaseAdmin
-      .from('stocks')
-      .update({ total: newTotal })
-      .eq('product_id', id)
-
-    if (updateError) throw updateError
-
-    // 재고 이력 기록
-    await supabaseAdmin.from('stock_histories').insert({
-      product_id: id,
-      type,
-      quantity,
-      reason: reason ?? null,
-    })
-
-    const newAvailable = type === 'in'
-      ? available + quantity
-      : available - quantity
-
-    return NextResponse.json({
-      product_id: id,
-      total:     newTotal,
-      sold:      stock.sold,
-      available: newAvailable,
-    })
+    return NextResponse.json(result)
   } catch {
     return NextResponse.json(
       { error: '재고 조정에 실패했습니다.' },

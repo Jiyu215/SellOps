@@ -308,6 +308,15 @@ export type Database = {
         Args: { product_ids: string[] }
         Returns: void
       }
+      adjust_product_stock: {
+        Args: {
+          p_product_id: string
+          p_type:       string
+          p_quantity:   number
+          p_reason?:    string | null
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
