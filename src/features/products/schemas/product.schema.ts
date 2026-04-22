@@ -24,3 +24,19 @@ export const productUpdateSchema = z
   .strict()
 
 export type ProductUpdateInput = z.infer<typeof productUpdateSchema>
+
+/**
+ * POST /api/products/[id]/stock/adjust 요청 바디 스키마.
+ *
+ * type: 'in'(입고) | 'out'(출고), quantity: 양의 정수, reason: 선택적 사유.
+ * unknown 필드는 .strict() 로 차단한다.
+ */
+export const stockAdjustSchema = z
+  .object({
+    type:     z.enum(['in', 'out']),
+    quantity: z.number().int().positive(),
+    reason:   z.string().max(100).optional(),
+  })
+  .strict()
+
+export type StockAdjustInput = z.infer<typeof stockAdjustSchema>

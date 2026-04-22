@@ -1,7 +1,7 @@
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
-import type { StockAdjustBody } from '@/features/products/types/product.type'
 import { requireAuth } from '@/lib/api/requireAuth'
+import { stockAdjustSchema } from '@/features/products/schemas/product.schema'
 
 export async function POST(
   request: Request,
@@ -12,7 +12,17 @@ export async function POST(
 
   try {
     const { id } = await params
-    const { type, quantity, reason } = await request.json() as StockAdjustBody
+    const raw = await request.json()
+
+    const parsed = stockAdjustSchema.safeParse(raw)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: '요청 데이터가 올바르지 않습니다.', details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      )
+    }
+
+    const { type, quantity, reason } = parsed.data
     const supabaseAdmin = getSupabaseAdmin()
 
     // 현재 재고 조회
