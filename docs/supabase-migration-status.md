@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | `supabase/migrations/001_delete_products_function.sql` | 상품 삭제 시 연관 테이블을 함께 정리하는 `delete_products` RPC 함수 | 기존 작업 |
 | `supabase/migrations/002_adjust_product_stock_function.sql` | 재고 입고/출고 조정을 atomic하게 처리하는 `adjust_product_stock` RPC 함수 | 적용 필요 |
+| `supabase/migrations/003_backfill_missing_stocks.sql` | 기존 상품 중 누락된 `stocks` row를 `0, 0`으로 보정 | 적용 필요 |
 
 ## `adjust_product_stock` 적용 목적
 
@@ -29,6 +30,7 @@
 | Supabase 타입에 `adjust_product_stock` RPC 정의 추가 | 완료 |
 | 재고 조정 API route 테스트 추가 | 완료 |
 | `adjust_product_stock` 함수 SQL 파일 추가 | 완료 |
+| 기존 상품 `stocks` row backfill SQL 파일 추가 | 완료 |
 | 실제 Supabase DB에 함수 적용 | 환경별 확인 필요 |
 | PostgREST schema cache reload | 환경별 확인 필요 |
 | 기존 상품의 누락된 `stocks` row backfill | 환경별 확인 필요 |
@@ -66,6 +68,8 @@ where not exists (
   where s.product_id = p.id
 );
 ```
+
+이 SQL은 `supabase/migrations/003_backfill_missing_stocks.sql`에도 정리되어 있다.
 
 특정 상품만 확인할 때는 아래 SQL을 사용한다.
 
