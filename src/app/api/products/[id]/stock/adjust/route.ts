@@ -1,11 +1,15 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import type { StockAdjustBody } from '@/features/products/types/product.type'
+import { requireAuth } from '@/lib/api/requireAuth'
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+
   try {
     const { id } = await params
     const { type, quantity, reason } = await request.json() as StockAdjustBody

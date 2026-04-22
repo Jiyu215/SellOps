@@ -1,10 +1,14 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/api/requireAuth'
 
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string; imageId: string }> }
 ) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+
   try {
     const { id, imageId } = await params
 

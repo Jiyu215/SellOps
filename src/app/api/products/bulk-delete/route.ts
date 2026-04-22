@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/api/requireAuth'
 
 /** Storage에서 product_images 버킷의 파일들을 일괄 삭제 */
 async function deleteStorageImages(productIds: string[]): Promise<void> {
@@ -20,6 +21,9 @@ async function deleteStorageImages(productIds: string[]): Promise<void> {
 }
 
 export async function DELETE(request: Request) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+
   try {
     const { ids } = await request.json() as { ids: string[] }
 

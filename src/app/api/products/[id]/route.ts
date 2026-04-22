@@ -1,11 +1,15 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
+import { requireAuth } from '@/lib/api/requireAuth'
 
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+
   try {
     const { id } = await params
 
@@ -56,6 +60,9 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+
   try {
     const { id } = await params
 
@@ -106,6 +113,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+
   try {
     const { id } = await params
     const body = await request.json()

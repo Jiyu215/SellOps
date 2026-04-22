@@ -1,7 +1,11 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/api/requireAuth'
 
 export async function GET(request: Request) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+
   try {
     const { searchParams } = new URL(request.url)
     const code      = searchParams.get('code') ?? ''

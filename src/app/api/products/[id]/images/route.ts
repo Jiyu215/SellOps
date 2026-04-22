@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import type { ImageType, ImageFormat } from '@/features/products/types/product.type'
+import { requireAuth } from '@/lib/api/requireAuth'
 
 const ALLOWED_FORMATS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
 const MAX_SIZE_MB = 10
@@ -9,6 +10,9 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+
   try {
     const { id } = await params
     const formData = await request.formData()

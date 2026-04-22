@@ -1,8 +1,12 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import type { ProductStatus } from '@/features/products/types/product.type'
+import { requireAuth } from '@/lib/api/requireAuth'
 
 export async function PATCH(request: Request) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+
   try {
     const { ids, status } = await request.json() as {
       ids: string[]

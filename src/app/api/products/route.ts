@@ -2,9 +2,13 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { ProductCreateBody, ProductStatus, SortOption } from '@/features/products/types/product.type'
+import { requireAuth } from '@/lib/api/requireAuth'
 
 
 export async function GET(request: Request) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+
   try {
     const { searchParams } = new URL(request.url)
     const search  = searchParams.get('search') ?? ''
@@ -105,6 +109,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+
   try {
     const body = await request.json() as ProductCreateBody
 
