@@ -1,9 +1,10 @@
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/requireAuth'
 
 /** Storage에서 product_images 버킷의 파일들을 일괄 삭제 */
 async function deleteStorageImages(productIds: string[]): Promise<void> {
+  const supabaseAdmin = getSupabaseAdmin()
   const { data: images } = await supabaseAdmin
     .from('product_images')
     .select('url')
@@ -26,6 +27,8 @@ export async function DELETE(request: Request) {
 
   try {
     const { ids } = await request.json() as { ids: string[] }
+
+    const supabaseAdmin = getSupabaseAdmin()
 
     if (!ids?.length) {
       return NextResponse.json(

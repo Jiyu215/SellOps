@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import type { StockAdjustBody } from '@/features/products/types/product.type'
 import { requireAuth } from '@/lib/api/requireAuth'
@@ -13,6 +13,7 @@ export async function POST(
   try {
     const { id } = await params
     const { type, quantity, reason } = await request.json() as StockAdjustBody
+    const supabaseAdmin = getSupabaseAdmin()
 
     // 현재 재고 조회
     const { data: stock, error: fetchError } = await supabaseAdmin

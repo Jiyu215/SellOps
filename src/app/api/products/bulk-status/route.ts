@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import type { ProductStatus } from '@/features/products/types/product.type'
 import { requireAuth } from '@/lib/api/requireAuth'
@@ -12,6 +12,8 @@ export async function PATCH(request: Request) {
       ids: string[]
       status: ProductStatus
     }
+
+    const supabaseAdmin = getSupabaseAdmin()
 
     if (!ids?.length) {
       return NextResponse.json(

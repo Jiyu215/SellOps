@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/requireAuth'
 
@@ -11,6 +11,7 @@ export async function DELETE(
 
   try {
     const { id, imageId } = await params
+    const supabaseAdmin = getSupabaseAdmin()
 
     // DB에서 URL 먼저 조회 (Storage path 추출용)
     const { data: image, error: fetchError } = await supabaseAdmin

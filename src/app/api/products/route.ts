@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { ProductCreateBody, ProductStatus, SortOption } from '@/features/products/types/product.type'
@@ -59,6 +59,7 @@ export async function GET(request: Request) {
     if (error) throw error
 
     // 상태별 집계 (필터 무관 전체 기준)
+    const supabaseAdmin = getSupabaseAdmin()
     const { data: summaryData } = await supabaseAdmin
       .from('products')
       .select('status')
@@ -114,6 +115,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json() as ProductCreateBody
+    const supabaseAdmin = getSupabaseAdmin()
 
     const { data, error } = await supabaseAdmin
       .from('products')

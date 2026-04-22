@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import type { ProductStatus } from '@/features/products/types/product.type'
 import { requireAuth } from '@/lib/api/requireAuth'
@@ -12,6 +12,7 @@ export async function GET(request: Request) {
     const search = searchParams.get('search') ?? ''
     const status = searchParams.get('status') as ProductStatus | ''
 
+    const supabaseAdmin = getSupabaseAdmin()
     let query = supabaseAdmin
       .from('products_with_stock')
       .select('product_code, name, price, stock_total, stock_sold, stock_available, status, created_at, updated_at')

@@ -4,7 +4,7 @@ import { MOCK_USER, MOCK_NOTIFICATIONS } from '@/constants/mockData';
 import { ProductsContent } from './ProductsContent';
 import { ProductsPageSkeleton } from './ProductsPageSkeleton';
 import { createClient } from '@/lib/supabase/server';
-import { supabaseAdmin } from '@/lib/supabase/admin';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import type { ProductListItem, ProductStatus } from '@/types/products';
 
 /**
@@ -26,7 +26,7 @@ export default async function ProductsPage() {
   const IMAGE_TYPE_PRIORITY = ['list', 'thumbnail', 'small', 'main'] as const;
 
   const { data: images } = ids.length
-    ? await supabaseAdmin
+    ? await getSupabaseAdmin()
         .from('product_images')
         .select('product_id, type, url')
         .in('product_id', ids)

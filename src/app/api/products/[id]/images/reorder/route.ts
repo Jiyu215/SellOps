@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/requireAuth'
 
@@ -11,6 +11,7 @@ export async function PATCH(
 
   try {
     const { id } = await params
+    const supabaseAdmin = getSupabaseAdmin()
     const { orders } = await request.json() as {
       orders: Array<{ id: string; order: number }>
     }

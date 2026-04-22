@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { requireAuth } from '@/lib/api/requireAuth'
 
 interface RegisterBody {
@@ -14,6 +14,7 @@ export async function POST(request: Request) {
 
   try {
     const { email, password, name } = await request.json() as RegisterBody
+    const supabaseAdmin = getSupabaseAdmin()
 
     if (!email || !password) {
       return NextResponse.json(

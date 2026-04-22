@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { supabaseAdmin } from '@/lib/supabase/admin';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import type { ProductDetail, ProductImage } from '@/types/products';
 
 /**
@@ -8,6 +8,7 @@ import type { ProductDetail, ProductImage } from '@/types/products';
  * Server Component, generateMetadata 에서만 사용
  */
 export async function getProductById(id: string): Promise<ProductDetail | null> {
+  const supabaseAdmin = getSupabaseAdmin()
   const { data: product, error } = await supabaseAdmin
     .from('products')
     .select('*')

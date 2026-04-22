@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import type { ImageType, ImageFormat } from '@/features/products/types/product.type'
 import { requireAuth } from '@/lib/api/requireAuth'
@@ -15,6 +15,7 @@ export async function POST(
 
   try {
     const { id } = await params
+    const supabaseAdmin = getSupabaseAdmin()
     const formData = await request.formData()
     const file     = formData.get('file') as File
     const type     = formData.get('type') as ImageType

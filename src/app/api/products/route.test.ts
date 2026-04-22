@@ -27,7 +27,7 @@ jest.mock('next/server', () => ({
 }))
 
 jest.mock('@/lib/supabase/server', () => ({ createClient: jest.fn() }))
-jest.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: {} }))
+jest.mock('@/lib/supabase/admin', () => ({ getSupabaseAdmin: jest.fn(() => ({})) }))
 jest.mock('@/lib/api/requireAuth')
 
 import type { User } from '@supabase/supabase-js'

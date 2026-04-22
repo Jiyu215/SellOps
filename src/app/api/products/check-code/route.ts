@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/requireAuth'
 
@@ -10,6 +10,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const code      = searchParams.get('code') ?? ''
     const excludeId = searchParams.get('excludeId')  // 수정 시 자기 자신 제외
+
+    const supabaseAdmin = getSupabaseAdmin()
 
     if (!code) {
       return NextResponse.json({ available: false })

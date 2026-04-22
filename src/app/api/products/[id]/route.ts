@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/api/requireAuth'
@@ -12,6 +12,7 @@ export async function GET(
 
   try {
     const { id } = await params
+    const supabaseAdmin = getSupabaseAdmin()
 
     // 상품 기본 정보
     const { data: product, error } = await supabaseAdmin
@@ -65,6 +66,7 @@ export async function DELETE(
 
   try {
     const { id } = await params
+    const supabaseAdmin = getSupabaseAdmin()
 
     // Storage 이미지 파일 삭제 (DB 삭제 전에)
     const { data: images } = await supabaseAdmin
@@ -119,6 +121,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await request.json()
+    const supabaseAdmin = getSupabaseAdmin()
 
     const { data, error } = await supabaseAdmin
       .from('products')

@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { supabaseAdmin } from '@/lib/supabase/admin';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import type { ProductFormData, ProductDetail, ProductStatus } from '@/types/products';
 
 // ── 상품 저장 서버 액션 ───────────────────────────────────────────────────────
@@ -20,6 +20,7 @@ export async function saveProductAction(
   id?: string,
   initialStock?: { total: number; sold: number; available: number },
 ): Promise<{ id: string; product?: ProductDetail }> {
+  const supabaseAdmin = getSupabaseAdmin()
   const now = new Date().toISOString();
 
   if (id) {

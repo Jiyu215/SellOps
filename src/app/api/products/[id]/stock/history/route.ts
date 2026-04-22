@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/requireAuth'
 
@@ -11,6 +11,7 @@ export async function GET(
 
   try {
     const { id } = await params
+    const supabaseAdmin = getSupabaseAdmin()
     const { searchParams } = new URL(request.url)
     const page  = Math.max(1, Number(searchParams.get('page') ?? 1))
     const limit = Number(searchParams.get('limit') ?? 20)
