@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/api/requireAuth'
+import { productUpdateSchema } from '@/features/products/schemas/product.schema'
 
 export async function GET(
   _req: Request,
@@ -120,12 +121,28 @@ export async function PATCH(
 
   try {
     const { id } = await params
-    const body = await request.json()
+    const raw = await request.json()
+
+    const parsed = productUpdateSchema.safeParse(raw)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: '요청 데이터가 올바르지 않습니다.', details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      )
+    }
+
+    if (Object.keys(parsed.data).length === 0) {
+      return NextResponse.json(
+        { error: '수정할 필드가 없습니다.' },
+        { status: 400 }
+      )
+    }
+
     const supabaseAdmin = getSupabaseAdmin()
 
     const { data, error } = await supabaseAdmin
       .from('products')
-      .update({ ...body, updated_at: new Date().toISOString() })
+      .update({ ...parsed.data, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
       .single()
