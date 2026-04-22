@@ -64,6 +64,8 @@ export function useSearchInput({
   const lastTriggeredRef   = useRef(initialValue);
   const debounceTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const inputValueRef      = useRef(initialValue);
+  const prevInitialRef     = useRef(initialValue);
 
   // onSearch 최신 참조 유지 — deps 없이 항상 현재 함수를 호출
   const onSearchRef = useRef(onSearch);
@@ -71,12 +73,20 @@ export function useSearchInput({
 
   useEffect(()=>{
     const normalized = initialValue.replace(/\s+/g, '');
-    setInputValue(initialValue);
-    lastTriggeredRef.current = normalized;
-    if (debounceTimerRef.current !== null) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
+    const shouldSyncInput = inputValueRef.current === prevInitialRef.current;
+
+    if (shouldSyncInput) {
+      // Sync the input from the URL only while the user has not diverged locally.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setInputValue(initialValue);
+      inputValueRef.current = initialValue;
+      lastTriggeredRef.current = normalized;
+      if (debounceTimerRef.current !== null) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
     }
+    prevInitialRef.current = initialValue;
   },[initialValue]);
 
   // 언마운트 시 펜딩 타이머·요청 정리
@@ -128,10 +138,12 @@ export function useSearchInput({
   }, [triggerImmediate]);
 
   const onInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
+    const nextValue = e.target.value;
+    inputValueRef.current = nextValue;
+    setInputValue(nextValue);
     // 조합 중이 아닐 때만 debounce 검색 실행
     // 조합 완료는 onCompositionEnd에서 처리
-    if (!isComposingRef.current) triggerDebounced(e.target.value);
+    if (!isComposingRef.current) triggerDebounced(nextValue);
   }, [triggerDebounced]);
 
   return { inputValue, onInputChange, onCompositionStart, onCompositionEnd };

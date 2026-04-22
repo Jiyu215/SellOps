@@ -209,7 +209,7 @@ describe('DashboardLayout - nativeScroll prop (PR 변경사항)', () => {
     );
     const root = container.firstChild as HTMLElement;
     // min-h-screen은 있어도 h-screen은 없어야 함
-    expect(root.className).not.toMatch(/\bh-screen\b/);
+    expect(root.className.split(/\s+/)).not.toContain('h-screen');
   });
 
   test('nativeScroll=true: overflow-hidden 클래스가 없다', () => {
