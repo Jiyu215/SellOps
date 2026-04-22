@@ -33,16 +33,19 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser();
-  const isAuthPage = request.nextUrl.pathname.startsWith('/auth');
-  const isApiRoute = request.nextUrl.pathname.startsWith('/api');
+  const { pathname } = request.nextUrl;
+  const isAuthPage    = pathname.startsWith('/auth');
+  const isApiRoute    = pathname.startsWith('/api');
+  // /auth/register는 로그인한 운영자만 접근 가능한 운영자 전용 페이지
+  const isRegisterPage = pathname === '/auth/register';
 
-  // 비로그인 → 로그인 페이지로
-  if (!user && !isAuthPage && !isApiRoute) {
+  // 비로그인 → /auth/register 포함 보호 경로 차단
+  if (!user && !isApiRoute && (!isAuthPage || isRegisterPage)) {
     return NextResponse.redirect(new URL('/auth/login', request.url));
   }
 
-  // 로그인 상태 → 로그인 페이지 접근 시 대시보드로
-  if (user && isAuthPage) {
+  // 로그인 상태 → /auth/* 접근 시 대시보드로 (단 /auth/register 제외)
+  if (user && isAuthPage && !isRegisterPage) {
     return NextResponse.redirect(new URL('/dashboard/dashboard', request.url));
   }
 
