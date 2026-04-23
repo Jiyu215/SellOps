@@ -452,3 +452,22 @@ describe('상태 필터', () => {
     expect(mockHandleOrderStatus).toHaveBeenCalledWith('order_confirmed');
   });
 });
+
+describe('orders variant API 결과 표시', () => {
+  test('orders variant에서는 내부 검색 필터를 다시 적용하지 않는다', () => {
+    mockFilterReturn({
+      filter: {
+        search: '없는 주문',
+        orderStatus: 'all',
+        paymentStatus: 'all',
+        shippingStatus: 'all',
+        paymentMethod: 'all',
+      },
+    });
+
+    render(<OrderTable orders={MOCK_ORDERS} variant="orders" />);
+
+    expect(screen.getAllByText('ORD-20260001').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('ORD-20260002').length).toBeGreaterThan(0);
+  });
+});

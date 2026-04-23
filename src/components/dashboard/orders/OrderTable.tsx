@@ -183,7 +183,11 @@ const FilterSelect = ({
  * - 최신 주문순(createdAt desc) 정렬
  * - 행·카드 클릭 → /dashboard/orders/:id
  */
-export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: OrderTableProps) => {
+export const OrderTable = ({
+  orders,
+  variant = 'dashboard',
+  onOrderUpdate,
+}: OrderTableProps) => {
   const {
     filter,
     currentPage,
@@ -223,6 +227,8 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
   );
 
   const filteredOrders = useMemo(() => {
+    if (isOrdersVariant) return orders;
+
     const q = filter.search.trim().toLowerCase();
     return sortedOrders.filter((order) => {
       const matchesSearch =
@@ -237,7 +243,7 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
 
       return matchesSearch && matchesOrderStatus && matchesPaymentStatus && matchesShipping;
     });
-  }, [sortedOrders, filter]);
+  }, [isOrdersVariant, orders, sortedOrders, filter]);
 
   // ── 페이지네이션 ──────────────────────────────────────────────────────────
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
