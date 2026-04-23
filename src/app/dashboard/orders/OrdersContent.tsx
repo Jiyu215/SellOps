@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { OrderTable } from '@/components/dashboard/orders';
-import { fetchOrderList } from '@/features/orders/api/order.api';
+import { fetchOrderList, updateOrderStatus } from '@/features/orders/api/order.api';
 import { useOrderFilter } from '@/hooks/useOrderFilter';
 import type { Order } from '@/types/dashboard';
 import type { OrderListQuery } from '@/features/orders/types/order.type';
@@ -66,7 +66,15 @@ export const OrdersContent = ({ initialOrders }: OrdersContentProps) => {
   }, [query, queryKey]);
 
   const handleOrderUpdate = useCallback(
-    (id: string, partial: Partial<Pick<Order, 'orderStatus' | 'paymentStatus' | 'shippingStatus'>>) => {
+    async (id: string, partial: Partial<Pick<Order, 'orderStatus' | 'paymentStatus' | 'shippingStatus'>>) => {
+      try {
+        await updateOrderStatus(id, partial);
+        setErrorMsg('');
+      } catch {
+        setErrorMsg('주문 상태 변경에 실패했습니다.');
+        return;
+      }
+
       setOrders((prev) =>
         prev.map((o) => (o.id === id ? { ...o, ...partial } : o)),
       );

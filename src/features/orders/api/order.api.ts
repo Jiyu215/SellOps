@@ -1,7 +1,10 @@
 import type {
+  Order,
   OrderListQuery,
   OrderListResponse,
 } from '@/features/orders/types/order.type'
+
+type OrderStatusPartial = Partial<Pick<Order, 'orderStatus' | 'paymentStatus' | 'shippingStatus'>>
 
 export async function fetchOrderList(
   query: OrderListQuery = {}
@@ -21,4 +24,25 @@ export async function fetchOrderList(
 
   if (!res.ok) throw new Error('주문 목록 조회 실패')
   return res.json() as Promise<OrderListResponse>
+}
+
+export async function updateOrderStatus(
+  id: string,
+  partial: OrderStatusPartial
+): Promise<void> {
+  const body: Record<string, string> = {}
+  if (partial.orderStatus)    body.order_status    = partial.orderStatus
+  if (partial.paymentStatus)  body.payment_status  = partial.paymentStatus
+  if (partial.shippingStatus) body.shipping_status = partial.shippingStatus
+
+  const res = await fetch(`/api/orders/${id}/status`, {
+    method:  'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(data.error ?? '주문 상태 변경 실패')
+  }
 }
