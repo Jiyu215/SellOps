@@ -66,6 +66,41 @@ export type Database = {
           },
         ]
       }
+      order_memos: {
+        Row: {
+          author_name: string | null
+          author_type: string
+          content: string
+          created_at: string
+          id: string
+          order_id: string
+        }
+        Insert: {
+          author_name?: string | null
+          author_type?: string
+          content: string
+          created_at?: string
+          id?: string
+          order_id: string
+        }
+        Update: {
+          author_name?: string | null
+          author_type?: string
+          content?: string
+          created_at?: string
+          id?: string
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_memos_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_status_histories: {
         Row: {
           actor_name: string | null
