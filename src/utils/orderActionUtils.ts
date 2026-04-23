@@ -7,7 +7,7 @@ export const ACTION_CONFIG: Record<ActionKey, ActionConfig> = {
   confirm_order: {
     label:         '주문확정',
     modalTitle:    '주문을 확정하시겠습니까?',
-    modalMessage:  '주문을 확정하면 배송 준비 단계로 전환됩니다.',
+    modalMessage:  '주문대기 상태를 주문확정으로 전환합니다.',
     confirmLabel:  '주문확정',
     buttonVariant: 'primary',
   },
@@ -58,7 +58,7 @@ export const ACTION_CONFIG: Record<ActionKey, ActionConfig> = {
 // ── 상태 전이 맵 ──────────────────────────────────────────────────────────
 
 const TRANSITIONS: Record<ActionKey, OrderTransition> = {
-  confirm_order:     { orderStatus: 'order_confirmed',  shippingStatus: 'shipping_ready'       },
+  confirm_order:     { orderStatus: 'order_confirmed'                                        },
   cancel_order:      { orderStatus: 'order_cancelled',  paymentStatus:  'payment_cancelled'    },
   confirm_payment:   { paymentStatus: 'payment_completed'                                      },
   start_shipping:    { shippingStatus: 'shipping_in_progress'                                  },

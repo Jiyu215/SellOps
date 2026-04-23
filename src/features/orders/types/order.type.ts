@@ -109,3 +109,15 @@ export interface OrderItemRow {
   product_code: string | null
   created_at: string | null
 }
+
+export interface OrderStatusHistoryRow {
+  id: string
+  order_id: string
+  status_type: 'order_status' | 'payment_status' | 'shipping_status'
+  from_status: string | null
+  to_status: string
+  reason: string | null
+  actor_type: 'admin' | 'system' | 'customer'
+  actor_name: string | null
+  created_at: string
+}

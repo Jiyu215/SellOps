@@ -170,10 +170,10 @@ describe('getActionsForOrder', () => {
 // ── getTransitionForAction ────────────────────────────────────────────────────
 
 describe('getTransitionForAction', () => {
-  test('confirm_order → order_confirmed + shipping_ready', () => {
+  test('confirm_order → order_confirmed만 변경', () => {
     const transition = getTransitionForAction('confirm_order');
     expect(transition.orderStatus).toBe('order_confirmed');
-    expect(transition.shippingStatus).toBe('shipping_ready');
+    expect(transition.shippingStatus).toBeUndefined();
     expect(transition.paymentStatus).toBeUndefined();
   });
 

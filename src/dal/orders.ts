@@ -16,12 +16,43 @@ import type {
   OrderListResponse,
   OrderProduct,
   OrderRow,
+  OrderStatusHistoryRow,
   PaymentMethod,
 } from '@/features/orders/types/order.type'
 
 type OrderSupabaseClient = SupabaseClient<Database>
 
 const DEFAULT_PAYMENT_METHOD: PaymentMethod = 'card'
+
+const STATUS_TYPE_LABEL: Record<OrderStatusHistoryRow['status_type'], string> = {
+  order_status:    '주문 상태',
+  payment_status:  '결제 상태',
+  shipping_status: '배송 상태',
+}
+
+const STATUS_VALUE_LABEL: Record<string, string> = {
+  order_waiting:        '주문대기',
+  order_confirmed:      '주문확정',
+  order_cancelled:      '주문취소',
+  order_completed:      '주문완료',
+  payment_pending:      '결제대기',
+  payment_completed:    '결제완료',
+  payment_failed:       '결제실패',
+  payment_cancelled:    '결제취소',
+  refund_in_progress:   '환불중',
+  refund_completed:     '환불완료',
+  shipping_ready:       '배송준비',
+  shipping_in_progress: '배송중',
+  shipping_completed:   '배송완료',
+  shipping_on_hold:     '배송보류',
+  return_completed:     '반품완료',
+}
+
+const ACTOR_TYPE_LABEL: Record<OrderStatusHistoryRow['actor_type'], string> = {
+  admin:    '관리자',
+  system:   '시스템',
+  customer: '고객',
+}
 
 function toOrderProduct(row: OrderItemRow): OrderProduct {
   return {
@@ -167,6 +198,24 @@ function buildMemoLog(row: OrderRow): OrderMemoEntry[] {
   ]
 }
 
+function formatStatusValue(value: string | null) {
+  if (!value) return ''
+  return STATUS_VALUE_LABEL[value] ?? value
+}
+
+function toStatusHistoryEntry(row: OrderStatusHistoryRow): OrderStatusHistoryEntry {
+  const typeLabel = STATUS_TYPE_LABEL[row.status_type]
+  const fromLabel = formatStatusValue(row.from_status)
+  const toLabel = formatStatusValue(row.to_status)
+
+  return {
+    timestamp: row.created_at,
+    label:     fromLabel ? `${typeLabel}: ${fromLabel} → ${toLabel}` : `${typeLabel}: ${toLabel}`,
+    actor:     row.actor_name ?? ACTOR_TYPE_LABEL[row.actor_type],
+    ...(row.reason ? { reason: row.reason } : {}),
+  }
+}
+
 function buildShippingInfo(row: OrderRow): OrderShippingInfo {
   return {
     carrier:        '',
@@ -176,7 +225,11 @@ function buildShippingInfo(row: OrderRow): OrderShippingInfo {
   }
 }
 
-function toOrderDetail(row: OrderRow, itemRows: OrderItemRow[]): OrderDetail {
+function toOrderDetail(
+  row: OrderRow,
+  itemRows: OrderItemRow[],
+  statusHistoryRows?: OrderStatusHistoryRow[],
+): OrderDetail {
   const order = toOrder(row, itemRows)
   const productTotal = order.products.reduce((sum, product) => sum + product.unitPrice * product.quantity, 0)
 
@@ -185,9 +238,17 @@ function toOrderDetail(row: OrderRow, itemRows: OrderItemRow[]): OrderDetail {
     shippingFee:   Math.max(0, row.total_amount - productTotal),
     shippingInfo:   buildShippingInfo(row),
     memoLog:        buildMemoLog(row),
-    statusHistory:  buildStatusHistory(row),
+    statusHistory:  statusHistoryRows
+      ? statusHistoryRows.map(toStatusHistoryEntry)
+      : buildStatusHistory(row),
     paymentDetail:  undefined,
   }
+}
+
+function isMissingHistoryTableError(error: { code?: string; message?: string }) {
+  return error.code === '42P01' ||
+    error.code === 'PGRST205' ||
+    Boolean(error.message?.includes('order_status_histories'))
 }
 
 export async function getOrders(
@@ -274,5 +335,17 @@ export async function getOrderDetail(
 
   if (itemError) throw itemError
 
-  return toOrderDetail(orderRow as OrderRow, (itemRows ?? []) as OrderItemRow[])
+  const { data: historyRows, error: historyError } = await supabase
+    .from('order_status_histories')
+    .select('*')
+    .eq('order_id', id)
+    .order('created_at', { ascending: false })
+
+  if (historyError && !isMissingHistoryTableError(historyError)) throw historyError
+
+  return toOrderDetail(
+    orderRow as OrderRow,
+    (itemRows ?? []) as OrderItemRow[],
+    historyError ? undefined : (historyRows ?? []) as OrderStatusHistoryRow[],
+  )
 }

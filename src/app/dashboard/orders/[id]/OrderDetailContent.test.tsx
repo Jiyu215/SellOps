@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { OrderDetailContent } from './OrderDetailContent'
 import type { OrderDetail } from '@/types/orderDetail'
-import { updateOrderStatus } from '@/features/orders/api/order.api'
+import { fetchOrderDetail, updateOrderStatus } from '@/features/orders/api/order.api'
 
 let latestOrderDetailViewProps: {
   order: OrderDetail
@@ -14,14 +14,21 @@ let latestOrderDetailViewProps: {
 jest.mock('@/components/dashboard/orders/OrderDetailView', () => ({
   OrderDetailView: (props: typeof latestOrderDetailViewProps) => {
     latestOrderDetailViewProps = props
-    return <div data-testid="order-status">{props?.order.shippingStatus}</div>
+    return (
+      <div>
+        <div data-testid="order-status">{props?.order.shippingStatus}</div>
+        <div data-testid="history-count">{props?.order.statusHistory.length}</div>
+      </div>
+    )
   },
 }))
 
 jest.mock('@/features/orders/api/order.api', () => ({
+  fetchOrderDetail: jest.fn(),
   updateOrderStatus: jest.fn(),
 }))
 
+const mockFetchOrderDetail = fetchOrderDetail as jest.MockedFunction<typeof fetchOrderDetail>
 const mockUpdateOrderStatus = updateOrderStatus as jest.MockedFunction<typeof updateOrderStatus>
 
 const MOCK_ORDER_DETAIL: OrderDetail = {
@@ -57,12 +64,24 @@ beforeEach(() => {
 })
 
 describe('OrderDetailContent', () => {
-  test('상태 변경 시 API를 호출하고 화면 상태를 갱신한다', async () => {
+  test('상태 변경 후 상세를 다시 조회해 상태 이력을 동기화한다', async () => {
     mockUpdateOrderStatus.mockResolvedValue()
+    mockFetchOrderDetail.mockResolvedValue({
+      ...MOCK_ORDER_DETAIL,
+      shippingStatus: 'shipping_in_progress',
+      statusHistory: [
+        {
+          timestamp: '2026-04-23T01:00:00.000Z',
+          label:     '배송 상태: 배송준비 → 배송중',
+          actor:     'admin@sellops.com',
+        },
+      ],
+    })
 
     render(<OrderDetailContent initialOrderDetail={MOCK_ORDER_DETAIL} />)
 
     expect(screen.getByTestId('order-status')).toHaveTextContent('shipping_ready')
+    expect(screen.getByTestId('history-count')).toHaveTextContent('0')
 
     await act(async () => {
       await latestOrderDetailViewProps?.onOrderUpdate('order-001', {
@@ -76,10 +95,12 @@ describe('OrderDetailContent', () => {
       })
     })
 
+    expect(mockFetchOrderDetail).toHaveBeenCalledWith('order-001')
     expect(screen.getByTestId('order-status')).toHaveTextContent('shipping_in_progress')
+    expect(screen.getByTestId('history-count')).toHaveTextContent('1')
   })
 
-  test('API 실패 시 에러 메시지를 보여주고 상태는 유지한다', async () => {
+  test('API 실패 시 에러 메시지를 보여주고 상태를 유지한다', async () => {
     mockUpdateOrderStatus.mockRejectedValue(new Error('db error'))
 
     render(<OrderDetailContent initialOrderDetail={MOCK_ORDER_DETAIL} />)
@@ -94,6 +115,7 @@ describe('OrderDetailContent', () => {
       expect(screen.getByText('주문 상태 변경에 실패했습니다.')).toBeInTheDocument()
     })
 
+    expect(mockFetchOrderDetail).not.toHaveBeenCalled()
     expect(screen.getByTestId('order-status')).toHaveTextContent('shipping_ready')
   })
 })

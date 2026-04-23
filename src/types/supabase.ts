@@ -66,6 +66,50 @@ export type Database = {
           },
         ]
       }
+      order_status_histories: {
+        Row: {
+          actor_name: string | null
+          actor_type: string
+          created_at: string
+          from_status: string | null
+          id: string
+          order_id: string
+          reason: string | null
+          status_type: string
+          to_status: string
+        }
+        Insert: {
+          actor_name?: string | null
+          actor_type?: string
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          order_id: string
+          reason?: string | null
+          status_type: string
+          to_status: string
+        }
+        Update: {
+          actor_name?: string | null
+          actor_type?: string
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          order_id?: string
+          reason?: string | null
+          status_type?: string
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_status_histories_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           created_at: string | null
@@ -340,6 +384,18 @@ export type Database = {
           p_reason?:    string | null
         }
         Returns: Json
+      }
+      update_order_status_with_history: {
+        Args: {
+          p_order_id: string
+          p_order_status?: string | null
+          p_payment_status?: string | null
+          p_shipping_status?: string | null
+          p_actor_type?: string | null
+          p_actor_name?: string | null
+          p_reason?: string | null
+        }
+        Returns: Database["public"]["Tables"]["orders"]["Row"]
       }
     }
     Enums: {

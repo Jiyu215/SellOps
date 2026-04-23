@@ -116,6 +116,16 @@ describe('GET /api/orders - 성공', () => {
     expect(response.body).toEqual(MOCK_ORDER_RESPONSE)
   })
 
+  test('query가 없으면 기본 page/limit으로 조회한다', async () => {
+    await GET(makeRequest())
+
+    expect(mockGetOrders).toHaveBeenCalledWith(expect.anything(), {
+      search: '',
+      page:   1,
+      limit:  20,
+    })
+  })
+
   test('query string을 getOrders 인자로 전달한다', async () => {
     await GET(makeRequest(
       'http://localhost/api/orders?search=SO-2026&page=2&limit=50&orderStatus=order_confirmed&paymentStatus=payment_completed&shippingStatus=shipping_ready&paymentMethod=card'
@@ -130,6 +140,38 @@ describe('GET /api/orders - 성공', () => {
       page:           2,
       limit:          50,
     })
+  })
+})
+
+describe('GET /api/orders - 잘못된 query 400', () => {
+  beforeEach(() => mockRequireAuth.mockImplementation(makeAuthedReturn))
+
+  test.each([
+    ['page', 'abc'],
+    ['page', '0'],
+    ['limit', '30'],
+    ['orderStatus', 'bad_status'],
+    ['paymentStatus', 'bad_status'],
+    ['shippingStatus', 'bad_status'],
+    ['paymentMethod', 'cash'],
+  ])('%s 값이 잘못되면 400을 반환하고 조회하지 않는다', async (key, value) => {
+    const response = await GET(makeRequest(
+      `http://localhost/api/orders?${key}=${value}`,
+    )) as MockRouteResponse
+
+    expect(response.status).toBe(400)
+    expect(response.body).toMatchObject({ error: 'invalid_order_query' })
+    expect(mockGetOrders).not.toHaveBeenCalled()
+    expect(mockGetSupabaseAdmin).not.toHaveBeenCalled()
+  })
+
+  test('search가 100자를 초과하면 400을 반환한다', async () => {
+    const response = await GET(makeRequest(
+      `http://localhost/api/orders?search=${'a'.repeat(101)}`,
+    )) as MockRouteResponse
+
+    expect(response.status).toBe(400)
+    expect(response.body).toMatchObject({ error: 'invalid_order_query' })
   })
 })
 

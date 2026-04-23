@@ -5,7 +5,11 @@
 jest.mock('server-only', () => ({}), { virtual: true })
 
 import { getOrderDetail, getOrders } from './orders'
-import type { OrderItemRow, OrderRow } from '@/features/orders/types/order.type'
+import type {
+  OrderItemRow,
+  OrderRow,
+  OrderStatusHistoryRow,
+} from '@/features/orders/types/order.type'
 
 const ORDER_ROW: OrderRow = {
   id:               'order-001',
@@ -34,6 +38,18 @@ const ITEM_ROW: OrderItemRow = {
   quantity:     1,
   product_code: 'KB-MXS-BLK',
   created_at:   '2026-04-23T00:00:00.000Z',
+}
+
+const HISTORY_ROW: OrderStatusHistoryRow = {
+  id:          'history-001',
+  order_id:    'order-001',
+  status_type: 'shipping_status',
+  from_status: 'shipping_ready',
+  to_status:   'shipping_in_progress',
+  reason:      '배송 시작',
+  actor_type:  'admin',
+  actor_name:  'admin@sellops.com',
+  created_at:  '2026-04-23T01:00:00.000Z',
 }
 
 function makeListSupabaseMock(
@@ -80,6 +96,7 @@ function makeListSupabaseMock(
 function makeDetailSupabaseMock(
   orderRow: OrderRow | null = ORDER_ROW,
   itemRows: OrderItemRow[] = [ITEM_ROW],
+  historyRows: OrderStatusHistoryRow[] = [HISTORY_ROW],
 ) {
   const maybeSingle = jest.fn().mockResolvedValue({
     data:  orderRow,
@@ -100,9 +117,19 @@ function makeDetailSupabaseMock(
     select: jest.fn().mockReturnValue({ eq: itemEq }),
   }
 
+  const historyOrder = jest.fn().mockResolvedValue({
+    data:  historyRows,
+    error: null,
+  })
+  const historyEq = jest.fn().mockReturnValue({ order: historyOrder })
+  const historyChain = {
+    select: jest.fn().mockReturnValue({ eq: historyEq }),
+  }
+
   const from = jest.fn((table: string) => {
     if (table === 'orders') return orderChain
     if (table === 'order_items') return itemChain
+    if (table === 'order_status_histories') return historyChain
     throw new Error(`Unexpected table: ${table}`)
   })
 
@@ -110,6 +137,7 @@ function makeDetailSupabaseMock(
     supabase: { from },
     orderChain,
     itemChain,
+    historyChain,
   }
 }
 
@@ -213,11 +241,14 @@ describe('getOrderDetail', () => {
             content:    '검수 완료',
           }),
         ],
-        statusHistory: expect.arrayContaining([
-          expect.objectContaining({ label: '주문 생성' }),
-          expect.objectContaining({ label: '결제 완료' }),
-          expect.objectContaining({ label: '주문 확정' }),
-        ]),
+        statusHistory: [
+          {
+            timestamp: '2026-04-23T01:00:00.000Z',
+            label:     '배송 상태: 배송준비 → 배송중',
+            actor:     'admin@sellops.com',
+            reason:    '배송 시작',
+          },
+        ],
       }),
     )
   })

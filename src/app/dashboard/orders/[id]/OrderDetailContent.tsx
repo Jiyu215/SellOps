@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react'
 import { OrderDetailView } from '@/components/dashboard/orders/OrderDetailView'
-import { updateOrderStatus } from '@/features/orders/api/order.api'
+import { fetchOrderDetail, updateOrderStatus } from '@/features/orders/api/order.api'
 import type { OrderDetail } from '@/types/orderDetail'
 import type { Order } from '@/types/dashboard'
 
@@ -18,8 +18,9 @@ export const OrderDetailContent = ({ initialOrderDetail }: OrderDetailContentPro
     async (id: string, partial: Partial<Pick<Order, 'orderStatus' | 'paymentStatus' | 'shippingStatus'>>) => {
       try {
         await updateOrderStatus(id, partial)
+        const updatedOrder = await fetchOrderDetail(id)
         setErrorMsg('')
-        setOrder((prev) => (prev.id === id ? { ...prev, ...partial } : prev))
+        setOrder(updatedOrder)
       } catch {
         setErrorMsg('주문 상태 변경에 실패했습니다.')
       }
