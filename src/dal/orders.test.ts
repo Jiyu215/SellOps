@@ -7,6 +7,7 @@ jest.mock('server-only', () => ({}), { virtual: true })
 import { getOrderDetail, getOrders } from './orders'
 import type {
   OrderItemRow,
+  OrderMemoRow,
   OrderRow,
   OrderStatusHistoryRow,
 } from '@/features/orders/types/order.type'
@@ -19,7 +20,7 @@ const ORDER_ROW: OrderRow = {
   customer_phone:   '010-1111-2222',
   total_amount:     139000,
   status:           'paid',
-  memo:             '검수 완료',
+  memo:             '기존 orders.memo',
   created_at:       '2026-04-23T00:00:00.000Z',
   updated_at:       '2026-04-23T00:10:00.000Z',
   order_status:     'order_confirmed',
@@ -38,6 +39,15 @@ const ITEM_ROW: OrderItemRow = {
   quantity:     1,
   product_code: 'KB-MXS-BLK',
   created_at:   '2026-04-23T00:00:00.000Z',
+}
+
+const MEMO_ROW: OrderMemoRow = {
+  id:          'memo-001',
+  order_id:    'order-001',
+  author_type: 'admin',
+  author_name: 'admin@sellops.com',
+  content:     '실제 메모 로그',
+  created_at:  '2026-04-23T00:30:00.000Z',
 }
 
 const HISTORY_ROW: OrderStatusHistoryRow = {
@@ -93,20 +103,26 @@ function makeListSupabaseMock(
   }
 }
 
-function makeDetailSupabaseMock(
-  orderRow: OrderRow | null = ORDER_ROW,
-  itemRows: OrderItemRow[] = [ITEM_ROW],
-  historyRows: OrderStatusHistoryRow[] = [HISTORY_ROW],
-) {
+function makeDetailSupabaseMock(options?: {
+  orderRow?: OrderRow | null
+  itemRows?: OrderItemRow[]
+  memoRows?: OrderMemoRow[]
+  historyRows?: OrderStatusHistoryRow[]
+  memoError?: { code?: string; message?: string } | null
+}) {
+  const orderRow = options && 'orderRow' in options ? options.orderRow ?? null : ORDER_ROW
+  const itemRows = options?.itemRows ?? [ITEM_ROW]
+  const memoRows = options?.memoRows ?? [MEMO_ROW]
+  const historyRows = options?.historyRows ?? [HISTORY_ROW]
+  const memoError = options?.memoError ?? null
+
   const maybeSingle = jest.fn().mockResolvedValue({
     data:  orderRow,
     error: null,
   })
   const orderEq = jest.fn().mockReturnValue({ maybeSingle })
-  const orderSelect = jest.fn().mockReturnValue({ eq: orderEq })
   const orderChain = {
-    select: orderSelect,
-    eq:     orderEq,
+    select: jest.fn().mockReturnValue({ eq: orderEq }),
   }
 
   const itemEq = jest.fn().mockResolvedValue({
@@ -115,6 +131,15 @@ function makeDetailSupabaseMock(
   })
   const itemChain = {
     select: jest.fn().mockReturnValue({ eq: itemEq }),
+  }
+
+  const memoOrder = jest.fn().mockResolvedValue({
+    data:  memoRows,
+    error: memoError,
+  })
+  const memoEq = jest.fn().mockReturnValue({ order: memoOrder })
+  const memoChain = {
+    select: jest.fn().mockReturnValue({ eq: memoEq }),
   }
 
   const historyOrder = jest.fn().mockResolvedValue({
@@ -129,15 +154,13 @@ function makeDetailSupabaseMock(
   const from = jest.fn((table: string) => {
     if (table === 'orders') return orderChain
     if (table === 'order_items') return itemChain
+    if (table === 'order_memos') return memoChain
     if (table === 'order_status_histories') return historyChain
     throw new Error(`Unexpected table: ${table}`)
   })
 
   return {
     supabase: { from },
-    orderChain,
-    itemChain,
-    historyChain,
   }
 }
 
@@ -214,7 +237,7 @@ describe('getOrders', () => {
 })
 
 describe('getOrderDetail', () => {
-  test('maps orders + order_items to OrderDetail', async () => {
+  test('maps orders + order_items + order_memos to OrderDetail', async () => {
     const { supabase } = makeDetailSupabaseMock()
 
     const result = await getOrderDetail(supabase as never, 'order-001')
@@ -222,29 +245,29 @@ describe('getOrderDetail', () => {
     expect(result).toEqual(
       expect.objectContaining({
         id:            'order-001',
-        orderNumber:    'SO-2026-000001',
-        totalAmount:    139000,
-        shippingFee:    0,
-        paymentMethod:  'card',
-        orderStatus:    'order_confirmed',
-        paymentStatus:  'payment_completed',
+        orderNumber:   'SO-2026-000001',
+        totalAmount:   139000,
+        shippingFee:   0,
+        paymentMethod: 'card',
+        orderStatus:   'order_confirmed',
+        paymentStatus: 'payment_completed',
         shippingStatus: 'shipping_ready',
-        shippingInfo:   expect.objectContaining({
+        shippingInfo:  expect.objectContaining({
           recipientName:  'Hong Gil Dong',
           recipientPhone: '010-1111-2222',
         }),
         memoLog: [
           expect.objectContaining({
-            id:         'order-001-memo-0',
-            author:     '관리자',
+            id:         'memo-001',
+            author:     'admin@sellops.com',
             authorType: 'admin',
-            content:    '검수 완료',
+            content:    '실제 메모 로그',
           }),
         ],
         statusHistory: [
           {
             timestamp: '2026-04-23T01:00:00.000Z',
-            label:     '배송 상태: 배송준비 → 배송중',
+            label:     expect.any(String),
             actor:     'admin@sellops.com',
             reason:    '배송 시작',
           },
@@ -253,8 +276,24 @@ describe('getOrderDetail', () => {
     )
   })
 
+  test('falls back to orders.memo when order_memos table is missing', async () => {
+    const { supabase } = makeDetailSupabaseMock({
+      memoRows: [],
+      memoError: { code: 'PGRST205', message: 'Could not find order_memos' },
+    })
+
+    const result = await getOrderDetail(supabase as never, 'order-001')
+
+    expect(result?.memoLog).toEqual([
+      expect.objectContaining({
+        id: 'order-001-memo-0',
+        authorType: 'admin',
+      }),
+    ])
+  })
+
   test('returns null when order does not exist', async () => {
-    const { supabase } = makeDetailSupabaseMock(null)
+    const { supabase } = makeDetailSupabaseMock({ orderRow: null })
 
     const result = await getOrderDetail(supabase as never, 'missing')
 

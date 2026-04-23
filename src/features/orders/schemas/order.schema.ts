@@ -86,5 +86,14 @@ export const orderStatusUpdateSchema = z
   .partial()
   .strict()
 
+export const orderMemoCreateSchema = z.object({
+  content: z
+    .string()
+    .trim()
+    .min(1)
+    .max(1000),
+}).strict()
+
 export type OrderStatusUpdateInput = z.infer<typeof orderStatusUpdateSchema>
 export type OrderListQueryInput = z.infer<typeof orderListQuerySchema>
+export type OrderMemoCreateInput = z.infer<typeof orderMemoCreateSchema>

@@ -1,4 +1,4 @@
-import { fetchOrderDetail, fetchOrderList, updateOrderStatus } from './order.api'
+import { createOrderMemo, fetchOrderDetail, fetchOrderList, updateOrderStatus } from './order.api'
 
 const mockFetch = jest.fn()
 
@@ -87,5 +87,31 @@ describe('updateOrderStatus', () => {
     await expect(
       updateOrderStatus('order-001', { shippingStatus: 'shipping_ready' })
     ).rejects.toThrow('주문 상태 변경에 실패했습니다.')
+  })
+})
+
+describe('createOrderMemo', () => {
+  test('POST /api/orders/[id]/memos 로 content body를 전송한다', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: jest.fn(),
+    })
+
+    await createOrderMemo('order-001', '고객 요청 메모')
+
+    expect(mockFetch).toHaveBeenCalledWith('/api/orders/order-001/memos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: '고객 요청 메모' }),
+    })
+  })
+
+  test('실패 응답이면 API 에러 메시지를 throw한다', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      json: jest.fn().mockResolvedValue({ error: '주문 메모 등록에 실패했습니다.' }),
+    })
+
+    await expect(createOrderMemo('order-001', '메모')).rejects.toThrow('주문 메모 등록에 실패했습니다.')
   })
 })

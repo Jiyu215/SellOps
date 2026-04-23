@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons';
 import type {
   OrderDetail,
+  OrderMemoActor,
   OrderMemoEntry,
   OrderStatusHistoryEntry,
   MemoAuthorType,
@@ -374,43 +375,48 @@ const MOCK_CURRENT_USER: { name: string; type: MemoAuthorType } = {
   type: 'admin',
 };
 
-const MemoLog = ({ initialEntries }: { 
-  initialEntries: OrderMemoEntry[];
+const MemoLog = ({
+  entries,
+  actor,
+  orderId,
+  onMemoCreate,
+}: {
+  entries: OrderMemoEntry[];
   actor: {
     name: string;
     type: MemoAuthorType;
   };
+  orderId: string;
+  onMemoCreate: (id: string, content: string) => void | Promise<void>;
 }) => {
-  const [entries, setEntries] = useState<OrderMemoEntry[]>(initialEntries);
   const [content, setContent] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const scrollRef             = useRef<HTMLDivElement>(null);
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     const trimmed = content.trim();
-    if (!trimmed) return;
+    if (!trimmed || isSubmitting) return;
 
-    const newEntry: OrderMemoEntry = {
-      id:         `memo-${Date.now()}`,
-      timestamp:  new Date().toISOString(),
-      author:     MOCK_CURRENT_USER.name,
-      authorType: MOCK_CURRENT_USER.type,
-      content:    trimmed,
-    };
+    setIsSubmitting(true);
 
-    setEntries((prev) => [newEntry, ...prev]);
-    setContent('');
+    try {
+      await onMemoCreate(orderId, trimmed);
+      setContent('');
 
     // 최신 항목(최상단)으로 스크롤
     if (scrollRef.current) {
       scrollRef.current.scrollTop = 0;
     }
-  }, [content]);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [content, isSubmitting, onMemoCreate, orderId]);
 
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        handleSubmit();
+        await handleSubmit();
       }
     },
     [handleSubmit],
@@ -478,12 +484,12 @@ const MemoLog = ({ initialEntries }: {
         {/* 현재 작성자 표시 */}
         <div className="flex items-center gap-xs px-sm pt-xs pb-0">
           <span
-            className={`text-[11px] font-semibold px-xs py-[2px] rounded-full ${MEMO_AUTHOR_CONFIG[MOCK_CURRENT_USER.type].badgeClass}`}
+            className={`text-[11px] font-semibold px-xs py-[2px] rounded-full ${MEMO_AUTHOR_CONFIG[actor.type].badgeClass}`}
           >
-            {MEMO_AUTHOR_CONFIG[MOCK_CURRENT_USER.type].label}
+            {MEMO_AUTHOR_CONFIG[actor.type].label}
           </span>
           <span className="text-caption font-semibold text-light-textPrimary dark:text-dark-textPrimary">
-            {MOCK_CURRENT_USER.name}
+            {actor.name}
           </span>
         </div>
 
@@ -533,10 +539,12 @@ const MemoLog = ({ initialEntries }: {
 
 interface OrderDetailViewProps {
   order:         OrderDetail;
+  currentMemoActor: OrderMemoActor;
   onOrderUpdate: (
     id:      string,
     partial: Partial<Pick<OrderDetail, 'orderStatus' | 'paymentStatus' | 'shippingStatus'>>,
   ) => void | Promise<void>;
+  onMemoCreate: (id: string, content: string) => void | Promise<void>;
 }
 
 /**
@@ -551,7 +559,7 @@ interface OrderDetailViewProps {
  * 6. 주문 메모       — append-only 커뮤니케이션 로그 (관리자/CS/고객)
  * 7. 액션 버튼       — OrderActionCell (showDetailLink=false)
  */
-export const OrderDetailView = ({ order, onOrderUpdate }: OrderDetailViewProps) => {
+export const OrderDetailView = ({ order, currentMemoActor, onOrderUpdate, onMemoCreate }: OrderDetailViewProps) => {
   const handleOrderUpdate = useCallback(
     (
       id:      string,
@@ -837,10 +845,12 @@ export const OrderDetailView = ({ order, onOrderUpdate }: OrderDetailViewProps) 
 
       {/* ── 섹션 6: 주문 메모 ──────────────────────────────────────────────── */}
       <SectionCard title="주문 메모">
-        <MemoLog 
-          initialEntries={order.memoLog} 
-          actor={MOCK_CURRENT_USER}
-          />
+        <MemoLog
+          entries={order.memoLog}
+          actor={currentMemoActor ?? MOCK_CURRENT_USER}
+          orderId={order.id}
+          onMemoCreate={onMemoCreate}
+        />
       </SectionCard>
 
       {/* ── 섹션 7: 액션 버튼 ──────────────────────────────────────────────── */}

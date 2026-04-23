@@ -27,6 +27,22 @@ export async function fetchOrderList(
   return res.json() as Promise<OrderListResponse>
 }
 
+export async function createOrderMemo(
+  id: string,
+  content: string,
+): Promise<void> {
+  const res = await fetch(`/api/orders/${id}/memos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  })
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(data.error ?? '주문 메모 등록에 실패했습니다.')
+  }
+}
+
 export async function fetchOrderDetail(id: string): Promise<OrderDetail> {
   const res = await fetch(`/api/orders/${id}`, { cache: 'no-store' })
 

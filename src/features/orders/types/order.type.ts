@@ -121,3 +121,12 @@ export interface OrderStatusHistoryRow {
   actor_name: string | null
   created_at: string
 }
+
+export interface OrderMemoRow {
+  id: string
+  order_id: string
+  author_type: 'admin' | 'cs' | 'customer'
+  author_name: string | null
+  content: string
+  created_at: string
+}

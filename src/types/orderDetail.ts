@@ -20,6 +20,11 @@ export interface OrderShippingInfo {
 /** 메모 작성자 유형 */
 export type MemoAuthorType = 'customer' | 'admin' | 'cs';
 
+export interface OrderMemoActor {
+  name: string;
+  type: MemoAuthorType;
+}
+
 /** 주문 메모 로그 항목 (append-only, 최신순 정렬) */
 export interface OrderMemoEntry {
   id:         string;

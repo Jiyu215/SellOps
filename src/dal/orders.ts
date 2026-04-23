@@ -14,6 +14,7 @@ import type {
   OrderItemRow,
   OrderListQuery,
   OrderListResponse,
+  OrderMemoRow,
   OrderProduct,
   OrderRow,
   OrderStatusHistoryRow,
@@ -51,6 +52,12 @@ const STATUS_VALUE_LABEL: Record<string, string> = {
 const ACTOR_TYPE_LABEL: Record<OrderStatusHistoryRow['actor_type'], string> = {
   admin:    '관리자',
   system:   '시스템',
+  customer: '고객',
+}
+
+const MEMO_AUTHOR_LABEL: Record<MemoAuthorType, string> = {
+  admin: '관리자',
+  cs: 'CS',
   customer: '고객',
 }
 
@@ -198,6 +205,16 @@ function buildMemoLog(row: OrderRow): OrderMemoEntry[] {
   ]
 }
 
+function toMemoEntry(row: OrderMemoRow): OrderMemoEntry {
+  return {
+    id:         row.id,
+    timestamp:  row.created_at,
+    author:     row.author_name ?? MEMO_AUTHOR_LABEL[row.author_type],
+    authorType: row.author_type,
+    content:    row.content,
+  }
+}
+
 function formatStatusValue(value: string | null) {
   if (!value) return ''
   return STATUS_VALUE_LABEL[value] ?? value
@@ -228,6 +245,7 @@ function buildShippingInfo(row: OrderRow): OrderShippingInfo {
 function toOrderDetail(
   row: OrderRow,
   itemRows: OrderItemRow[],
+  memoRows?: OrderMemoRow[],
   statusHistoryRows?: OrderStatusHistoryRow[],
 ): OrderDetail {
   const order = toOrder(row, itemRows)
@@ -237,7 +255,9 @@ function toOrderDetail(
     ...order,
     shippingFee:   Math.max(0, row.total_amount - productTotal),
     shippingInfo:   buildShippingInfo(row),
-    memoLog:        buildMemoLog(row),
+    memoLog:        memoRows && memoRows.length > 0
+      ? memoRows.map(toMemoEntry)
+      : buildMemoLog(row),
     statusHistory:  statusHistoryRows
       ? statusHistoryRows.map(toStatusHistoryEntry)
       : buildStatusHistory(row),
@@ -249,6 +269,12 @@ function isMissingHistoryTableError(error: { code?: string; message?: string }) 
   return error.code === '42P01' ||
     error.code === 'PGRST205' ||
     Boolean(error.message?.includes('order_status_histories'))
+}
+
+function isMissingMemoTableError(error: { code?: string; message?: string }) {
+  return error.code === '42P01' ||
+    error.code === 'PGRST205' ||
+    Boolean(error.message?.includes('order_memos'))
 }
 
 export async function getOrders(
@@ -335,6 +361,14 @@ export async function getOrderDetail(
 
   if (itemError) throw itemError
 
+  const { data: memoRows, error: memoError } = await supabase
+    .from('order_memos')
+    .select('*')
+    .eq('order_id', id)
+    .order('created_at', { ascending: false })
+
+  if (memoError && !isMissingMemoTableError(memoError)) throw memoError
+
   const { data: historyRows, error: historyError } = await supabase
     .from('order_status_histories')
     .select('*')
@@ -346,6 +380,7 @@ export async function getOrderDetail(
   return toOrderDetail(
     orderRow as OrderRow,
     (itemRows ?? []) as OrderItemRow[],
+    memoError ? undefined : (memoRows ?? []) as OrderMemoRow[],
     historyError ? undefined : (historyRows ?? []) as OrderStatusHistoryRow[],
   )
 }
