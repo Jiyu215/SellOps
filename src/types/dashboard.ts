@@ -2,6 +2,22 @@
 // Dashboard 전용 TypeScript 타입 정의
 // ============================================================
 
+import type { Order } from '@/features/orders/types/order.type'
+
+export type {
+  Order,
+  OrderCustomer,
+  OrderFilter,
+  OrderItemRow,
+  OrderProduct,
+  OrderRow,
+  OrderStatusType,
+  OrderStockStatus,
+  PaymentMethod,
+  PaymentStatusType,
+  ShippingStatusType,
+} from '@/features/orders/types/order.type'
+
 // ── KPI 카드 ──────────────────────────────────────────────
 export type KPIStatus = 'success' | 'warning' | 'critical' | 'info';
 
@@ -52,71 +68,8 @@ export interface InventoryItem {
   unit: string;
 }
 
-// ── 주문 ──────────────────────────────────────────────────
-
-/** 주문 상태 */
-export type OrderStatusType =
-  | 'order_waiting'   // 주문대기
-  | 'order_confirmed' // 주문확정
-  | 'order_cancelled' // 주문취소
-  | 'order_completed'; // 주문완료
-
-/** 결제 상태 */
-export type PaymentStatusType =
-  | 'payment_pending'    // 결제대기
-  | 'payment_completed'  // 결제완료
-  | 'payment_failed'     // 결제실패
-  | 'payment_cancelled'  // 결제취소
-  | 'refund_in_progress' // 환불중
-  | 'refund_completed';  // 환불완료
-
-/** 배송 상태 */
-export type ShippingStatusType =
-  | 'shipping_ready'       // 배송준비
-  | 'shipping_in_progress' // 배송중
-  | 'shipping_completed'   // 배송완료
-  | 'shipping_on_hold'     // 배송보류
-  | 'return_completed';    // 반품완료
-
-export type PaymentMethod = 'card' | 'bank_transfer' | 'kakao_pay' | 'naver_pay';
-
-export interface OrderCustomer {
-  name: string;
-  email: string;
-  phone: string;
-  tier?: string; // 회원 등급 (VIP, Gold, Silver, 일반 등)
-}
-
-export interface OrderProduct {
-  name: string;
-  sku: string;
-  quantity: number;
-  unitPrice: number;
-}
-
-export interface Order {
-  id: string;
-  orderNumber: string;
-  customer: OrderCustomer;
-  products: OrderProduct[];
-  totalAmount: number;
-  paymentMethod: PaymentMethod;
-  orderStatus: OrderStatusType;
-  paymentStatus: PaymentStatusType;
-  shippingStatus: ShippingStatusType;
-  createdAt: string; // ISO 8601
-  shippingAddress?: string;
-}
-
-// ── 필터 / 검색 ───────────────────────────────────────────
-export interface OrderFilter {
-  search: string;
-  orderStatus: OrderStatusType | 'all';
-  paymentStatus: PaymentStatusType | 'all';
-  shippingStatus: ShippingStatusType | 'all';
-  paymentMethod: PaymentMethod | 'all';
-  dateRange?: { from: string; to: string };
-}
+// 주문 도메인 타입은 '@/features/orders/types/order.type'에서 정의하고,
+// 기존 import 호환성을 위해 이 파일에서 re-export한다.
 
 // ── 사용자 / 프로필 ───────────────────────────────────────
 export interface UserProfile {
