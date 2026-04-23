@@ -62,6 +62,23 @@ export interface OrderFilter {
   dateRange?: { from: string; to: string }
 }
 
+export interface OrderListQuery {
+  search?: string
+  orderStatus?: OrderStatusType | ''
+  paymentStatus?: PaymentStatusType | ''
+  shippingStatus?: ShippingStatusType | ''
+  paymentMethod?: PaymentMethod | ''
+  page?: number
+  limit?: 10 | 20 | 50 | 100
+}
+
+export interface OrderListResponse {
+  items: Order[]
+  total: number
+  page: number
+  limit: number
+}
+
 export interface OrderRow {
   id: string
   order_number: string

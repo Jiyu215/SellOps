@@ -16,22 +16,28 @@ export type Database = {
     Tables: {
       order_items: {
         Row: {
+          created_at: string | null
           order_id: string
           price: number
+          product_code: string | null
           product_id: string
           product_name: string
           quantity: number
         }
         Insert: {
+          created_at?: string | null
           order_id: string
           price: number
+          product_code?: string | null
           product_id: string
           product_name: string
           quantity: number
         }
         Update: {
+          created_at?: string | null
           order_id?: string
           price?: number
+          product_code?: string | null
           product_id?: string
           product_name?: string
           quantity?: number
@@ -68,8 +74,14 @@ export type Database = {
           customer_phone: string | null
           id: string
           memo: string | null
+          order_status: string
           order_number: string
+          payment_method: string | null
+          payment_status: string
+          shipping_address: string | null
+          shipping_status: string
           status: string
+          stock_status: string
           total_amount: number
           updated_at: string | null
         }
@@ -80,8 +92,14 @@ export type Database = {
           customer_phone?: string | null
           id?: string
           memo?: string | null
+          order_status?: string
           order_number: string
+          payment_method?: string | null
+          payment_status?: string
+          shipping_address?: string | null
+          shipping_status?: string
           status?: string
+          stock_status?: string
           total_amount: number
           updated_at?: string | null
         }
@@ -92,8 +110,14 @@ export type Database = {
           customer_phone?: string | null
           id?: string
           memo?: string | null
+          order_status?: string
           order_number?: string
+          payment_method?: string | null
+          payment_status?: string
+          shipping_address?: string | null
+          shipping_status?: string
           status?: string
+          stock_status?: string
           total_amount?: number
           updated_at?: string | null
         }
