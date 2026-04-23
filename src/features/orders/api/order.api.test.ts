@@ -1,4 +1,4 @@
-import { fetchOrderList, updateOrderStatus } from './order.api'
+import { fetchOrderDetail, fetchOrderList, updateOrderStatus } from './order.api'
 
 const mockFetch = jest.fn()
 
@@ -28,6 +28,29 @@ describe('fetchOrderList', () => {
       '/api/orders?search=SO-2026&orderStatus=order_confirmed&paymentStatus=payment_completed&shippingStatus=shipping_ready&paymentMethod=card&page=1&limit=100',
       { cache: 'no-store' },
     )
+  })
+})
+
+describe('fetchOrderDetail', () => {
+  test('GET /api/orders/[id] 를 no-store 로 호출한다', async () => {
+    mockFetch.mockResolvedValue({
+      ok:   true,
+      json: jest.fn().mockResolvedValue({ id: 'order-001' }),
+    })
+
+    await fetchOrderDetail('order-001')
+
+    expect(mockFetch).toHaveBeenCalledWith('/api/orders/order-001', { cache: 'no-store' })
+  })
+
+  test('404 응답이면 NOT_FOUND 를 throw 한다', async () => {
+    mockFetch.mockResolvedValue({
+      ok:     false,
+      status: 404,
+      json:   jest.fn(),
+    })
+
+    await expect(fetchOrderDetail('order-001')).rejects.toThrow('NOT_FOUND')
   })
 })
 

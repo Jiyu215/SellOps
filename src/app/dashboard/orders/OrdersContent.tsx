@@ -5,10 +5,13 @@ import { OrderTable } from '@/components/dashboard/orders';
 import { fetchOrderList, updateOrderStatus } from '@/features/orders/api/order.api';
 import { useOrderFilter } from '@/hooks/useOrderFilter';
 import type { Order } from '@/types/dashboard';
-import type { OrderListQuery } from '@/features/orders/types/order.type';
+import type { OrderListQuery, OrderPageLimit } from '@/features/orders/types/order.type';
 
 interface OrdersContentProps {
   initialOrders: Order[];
+  initialTotal: number;
+  initialPage: number;
+  initialLimit: OrderPageLimit;
 }
 
 /**
@@ -17,9 +20,17 @@ interface OrdersContentProps {
  * useSearchParams(useOrderFilter 내부)를 사용하므로 Suspense 바운더리 필요.
  * 실제 서비스에서는 서버 액션 또는 React Query로 데이터를 패칭한다.
  */
-export const OrdersContent = ({ initialOrders }: OrdersContentProps) => {
-  const { filter } = useOrderFilter();
+export const OrdersContent = ({
+  initialOrders,
+  initialTotal,
+  initialPage,
+  initialLimit,
+}: OrdersContentProps) => {
+  const { filter, currentPage, setCurrentPage } = useOrderFilter();
   const [orders, setOrders] = useState<Order[]>(() => initialOrders);
+  const [total, setTotal] = useState(initialTotal);
+  const [page, setPage] = useState(initialPage);
+  const [limit, setLimit] = useState(initialLimit);
   const [errorMsg, setErrorMsg] = useState('');
 
   const query = useMemo<OrderListQuery>(() => ({
@@ -28,14 +39,16 @@ export const OrdersContent = ({ initialOrders }: OrdersContentProps) => {
     paymentStatus:  filter.paymentStatus === 'all' ? '' : filter.paymentStatus,
     shippingStatus: filter.shippingStatus === 'all' ? '' : filter.shippingStatus,
     paymentMethod:  filter.paymentMethod === 'all' ? '' : filter.paymentMethod,
-    page:           1,
-    limit:          100,
+    page:           currentPage,
+    limit,
   }), [
     filter.search,
     filter.orderStatus,
     filter.paymentStatus,
     filter.shippingStatus,
     filter.paymentMethod,
+    currentPage,
+    limit,
   ]);
   const queryKey = JSON.stringify(query);
   const lastLoadedQueryKeyRef = useRef(queryKey);
@@ -52,6 +65,9 @@ export const OrdersContent = ({ initialOrders }: OrdersContentProps) => {
         if (ignore) return;
         setErrorMsg('');
         setOrders(data.items);
+        setTotal(data.total);
+        setPage(data.page);
+        setLimit(data.limit);
       } catch {
         if (ignore) return;
         setErrorMsg('주문 목록 조회에 실패했습니다.');
@@ -93,6 +109,12 @@ export const OrdersContent = ({ initialOrders }: OrdersContentProps) => {
         orders={orders}
         variant="orders"
         onOrderUpdate={handleOrderUpdate}
+        pagination={{
+          total,
+          page,
+          limit,
+          onPageChange: setCurrentPage,
+        }}
       />
     </>
   );

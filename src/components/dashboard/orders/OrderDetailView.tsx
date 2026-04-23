@@ -1,6 +1,5 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { useCallback, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
@@ -537,7 +536,7 @@ interface OrderDetailViewProps {
   onOrderUpdate: (
     id:      string,
     partial: Partial<Pick<OrderDetail, 'orderStatus' | 'paymentStatus' | 'shippingStatus'>>,
-  ) => void;
+  ) => void | Promise<void>;
 }
 
 /**

@@ -25,6 +25,8 @@ export type PaymentMethod = 'card' | 'bank_transfer' | 'kakao_pay' | 'naver_pay'
 
 export type OrderStockStatus = 'none' | 'applied' | 'released'
 
+export type OrderPageLimit = 10 | 20 | 50 | 100
+
 export interface OrderCustomer {
   name: string
   email: string
@@ -69,14 +71,14 @@ export interface OrderListQuery {
   shippingStatus?: ShippingStatusType | ''
   paymentMethod?: PaymentMethod | ''
   page?: number
-  limit?: 10 | 20 | 50 | 100
+  limit?: OrderPageLimit
 }
 
 export interface OrderListResponse {
   items: Order[]
   total: number
   page: number
-  limit: number
+  limit: OrderPageLimit
 }
 
 export interface OrderRow {

@@ -1,29 +1,40 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { OrderDetailView } from '@/components/dashboard/orders/OrderDetailView';
-import type { OrderDetail } from '@/types/orderDetail';
-import type { Order } from '@/types/dashboard';
+import { useCallback, useState } from 'react'
+import { OrderDetailView } from '@/components/dashboard/orders/OrderDetailView'
+import { updateOrderStatus } from '@/features/orders/api/order.api'
+import type { OrderDetail } from '@/types/orderDetail'
+import type { Order } from '@/types/dashboard'
 
 interface OrderDetailContentProps {
-  initialOrder: OrderDetail;
+  initialOrderDetail: OrderDetail
 }
 
-/**
- * 주문 상세 콘텐츠 (Client Component)
- *
- * 상태 변경(OrderActionCell → onOrderUpdate)을 처리하고
- * OrderDetailView에 최신 order를 전달한다.
- */
-export const OrderDetailContent = ({ initialOrder }: OrderDetailContentProps) => {
-  const [order, setOrder] = useState<OrderDetail>(initialOrder);
+export const OrderDetailContent = ({ initialOrderDetail }: OrderDetailContentProps) => {
+  const [order, setOrder] = useState<OrderDetail>(initialOrderDetail)
+  const [errorMsg, setErrorMsg] = useState('')
 
   const handleOrderUpdate = useCallback(
-    (id: string, partial: Partial<Pick<Order, 'orderStatus' | 'paymentStatus' | 'shippingStatus'>>) => {
-      setOrder((prev) => (prev.id === id ? { ...prev, ...partial } : prev));
+    async (id: string, partial: Partial<Pick<Order, 'orderStatus' | 'paymentStatus' | 'shippingStatus'>>) => {
+      try {
+        await updateOrderStatus(id, partial)
+        setErrorMsg('')
+        setOrder((prev) => (prev.id === id ? { ...prev, ...partial } : prev))
+      } catch {
+        setErrorMsg('주문 상태 변경에 실패했습니다.')
+      }
     },
     [],
-  );
+  )
 
-  return <OrderDetailView order={order} onOrderUpdate={handleOrderUpdate} />;
-};
+  return (
+    <>
+      {errorMsg && (
+        <p className="mb-sm text-caption text-light-error dark:text-dark-error">
+          {errorMsg}
+        </p>
+      )}
+      <OrderDetailView order={order} onOrderUpdate={handleOrderUpdate} />
+    </>
+  )
+}

@@ -1,17 +1,20 @@
 import { Suspense } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
-import { MOCK_USER, MOCK_NOTIFICATIONS } from '@/constants/mockData';
+import { MOCK_NOTIFICATIONS, MOCK_USER } from '@/constants/mockData';
+import { getOrders } from '@/dal/orders';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { OrdersContent } from './OrdersContent';
 import { OrdersPageSkeleton } from './OrdersPageSkeleton';
-import { getSupabaseAdmin } from '@/lib/supabase/admin';
-import { getOrders } from '@/dal/orders';
 import type {
   OrderListQuery,
   OrderStatusType,
   PaymentMethod,
+  OrderPageLimit,
   PaymentStatusType,
   ShippingStatusType,
 } from '@/features/orders/types/order.type';
+
+const ORDER_SERVER_PAGE_SIZE: OrderPageLimit = 20;
 
 type OrdersPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -22,12 +25,11 @@ function getParam(params: Record<string, string | string[] | undefined>, key: st
   return Array.isArray(value) ? value[0] : value;
 }
 
-/**
- * 주문 관리 페이지 (Server Component)
- *
- * - DashboardLayout: 사이드바 + 헤더 공통 레이아웃
- * - OrdersContent: 클라이언트 컴포넌트 (useSearchParams → Suspense 필요)
- */
+function parsePage(value: string | undefined) {
+  const page = Number(value ?? 1);
+  return Number.isFinite(page) && page >= 1 ? page : 1;
+}
+
 export default async function OrdersPage({ searchParams }: OrdersPageProps) {
   const params = await searchParams ?? {};
   const query: OrderListQuery = {
@@ -36,10 +38,10 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
     paymentStatus:  (getParam(params, 'payment_status') ?? '') as PaymentStatusType | '',
     shippingStatus: (getParam(params, 'shipping_status') ?? '') as ShippingStatusType | '',
     paymentMethod:  (getParam(params, 'order_payment') ?? '') as PaymentMethod | '',
-    page:           1,
-    limit:          100,
+    page:           parsePage(getParam(params, 'order_page')),
+    limit:          ORDER_SERVER_PAGE_SIZE,
   };
-  const { items: initialOrders } = await getOrders(getSupabaseAdmin(), query);
+  const initialOrderList = await getOrders(getSupabaseAdmin(), query);
 
   return (
     <DashboardLayout
@@ -48,7 +50,12 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
       notifications={MOCK_NOTIFICATIONS}
     >
       <Suspense fallback={<OrdersPageSkeleton />}>
-        <OrdersContent initialOrders={initialOrders} />
+        <OrdersContent
+          initialOrders={initialOrderList.items}
+          initialTotal={initialOrderList.total}
+          initialPage={initialOrderList.page}
+          initialLimit={initialOrderList.limit}
+        />
       </Suspense>
     </DashboardLayout>
   );

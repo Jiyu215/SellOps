@@ -3,6 +3,13 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/supabase'
 import type {
+  MemoAuthorType,
+  OrderDetail,
+  OrderMemoEntry,
+  OrderShippingInfo,
+  OrderStatusHistoryEntry,
+} from '@/types/orderDetail'
+import type {
   Order,
   OrderItemRow,
   OrderListQuery,
@@ -55,6 +62,132 @@ function groupItemsByOrderId(itemRows: OrderItemRow[]) {
   }
 
   return itemsByOrderId
+}
+
+function makeTimelineBaseDate(row: OrderRow) {
+  return new Date(row.created_at ?? row.updated_at ?? Date.now())
+}
+
+function addHistoryEntry(
+  entries: OrderStatusHistoryEntry[],
+  baseDate: Date,
+  minsOffset: number,
+  label: string,
+  actor: string,
+  reason?: string,
+) {
+  entries.push({
+    timestamp: new Date(baseDate.getTime() + minsOffset * 60 * 1000).toISOString(),
+    label,
+    actor,
+    ...(reason ? { reason } : {}),
+  })
+}
+
+function buildStatusHistory(row: OrderRow): OrderStatusHistoryEntry[] {
+  const entries: OrderStatusHistoryEntry[] = []
+  const baseDate = makeTimelineBaseDate(row)
+
+  addHistoryEntry(entries, baseDate, 0, '주문 생성', '고객')
+
+  if (
+    row.order_status === 'order_cancelled' ||
+    row.payment_status === 'payment_cancelled'
+  ) {
+    addHistoryEntry(entries, baseDate, 30, '주문 취소', '관리자', '고객 요청에 의한 취소')
+    return entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+  }
+
+  if (row.payment_status === 'payment_failed') {
+    addHistoryEntry(entries, baseDate, 5, '결제 실패', '시스템', '결제 승인 거절')
+    return entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+  }
+
+  if (
+    row.payment_status === 'payment_completed' ||
+    row.payment_status === 'refund_in_progress' ||
+    row.payment_status === 'refund_completed'
+  ) {
+    addHistoryEntry(entries, baseDate, 1, '결제 완료', '시스템')
+  }
+
+  if (row.order_status === 'order_confirmed' || row.order_status === 'order_completed') {
+    addHistoryEntry(entries, baseDate, 2, '주문 확정', '관리자')
+  }
+
+  if (
+    row.shipping_status === 'shipping_ready' ||
+    row.shipping_status === 'shipping_in_progress' ||
+    row.shipping_status === 'shipping_completed' ||
+    row.shipping_status === 'return_completed'
+  ) {
+    addHistoryEntry(entries, baseDate, 60, '상품 준비', '관리자', '출고 정보 준비 완료')
+  }
+
+  if (
+    row.shipping_status === 'shipping_in_progress' ||
+    row.shipping_status === 'shipping_completed' ||
+    row.shipping_status === 'return_completed'
+  ) {
+    addHistoryEntry(entries, baseDate, 24 * 60, '출고 처리', '관리자')
+  }
+
+  if (row.shipping_status === 'shipping_completed' || row.order_status === 'order_completed') {
+    addHistoryEntry(entries, baseDate, 72 * 60, '배송 완료', '시스템')
+  }
+
+  if (row.payment_status === 'refund_in_progress' || row.payment_status === 'refund_completed') {
+    addHistoryEntry(entries, baseDate, 48 * 60, '환불 요청', '고객', '취소/환불 요청')
+  }
+
+  if (row.payment_status === 'refund_completed') {
+    addHistoryEntry(entries, baseDate, 54 * 60, '환불 완료', '시스템')
+  }
+
+  if (row.shipping_status === 'return_completed') {
+    addHistoryEntry(entries, baseDate, 80 * 60, '반품 접수', '고객', '상품 불량/변심')
+    addHistoryEntry(entries, baseDate, 90 * 60, '반품 완료', '관리자', '반품 처리 완료')
+  }
+
+  return entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+}
+
+function buildMemoLog(row: OrderRow): OrderMemoEntry[] {
+  if (!row.memo?.trim()) return []
+
+  const timestamp = row.updated_at ?? row.created_at ?? new Date().toISOString()
+  return [
+    {
+      id:         `${row.id}-memo-0`,
+      timestamp,
+      author:     '관리자',
+      authorType: 'admin' as MemoAuthorType,
+      content:    row.memo,
+    },
+  ]
+}
+
+function buildShippingInfo(row: OrderRow): OrderShippingInfo {
+  return {
+    carrier:        '',
+    trackingNumber: '',
+    recipientName:  row.customer_name,
+    recipientPhone: row.customer_phone ?? '',
+  }
+}
+
+function toOrderDetail(row: OrderRow, itemRows: OrderItemRow[]): OrderDetail {
+  const order = toOrder(row, itemRows)
+  const productTotal = order.products.reduce((sum, product) => sum + product.unitPrice * product.quantity, 0)
+
+  return {
+    ...order,
+    shippingFee:   Math.max(0, row.total_amount - productTotal),
+    shippingInfo:   buildShippingInfo(row),
+    memoLog:        buildMemoLog(row),
+    statusHistory:  buildStatusHistory(row),
+    paymentDetail:  undefined,
+  }
 }
 
 export async function getOrders(
@@ -119,4 +252,27 @@ export async function getOrders(
     page,
     limit,
   }
+}
+
+export async function getOrderDetail(
+  supabase: OrderSupabaseClient,
+  id: string,
+): Promise<OrderDetail | null> {
+  const { data: orderRow, error } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!orderRow) return null
+
+  const { data: itemRows, error: itemError } = await supabase
+    .from('order_items')
+    .select('*')
+    .eq('order_id', id)
+
+  if (itemError) throw itemError
+
+  return toOrderDetail(orderRow as OrderRow, (itemRows ?? []) as OrderItemRow[])
 }

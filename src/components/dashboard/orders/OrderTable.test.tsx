@@ -20,6 +20,34 @@ beforeEach(() => {
   });
 });
 
+describe('orders variant server pagination', () => {
+  test('uses server total/page and delegates page changes', () => {
+    const handlePageChange = jest.fn();
+
+    render(
+      <OrderTable
+        orders={MOCK_ORDERS}
+        variant="orders"
+        pagination={{
+          total: 42,
+          page:  2,
+          limit: 20,
+          onPageChange: handlePageChange,
+        }}
+      />
+    );
+
+    expect(screen.getByText('42')).toBeInTheDocument();
+    expect(screen.getByText('2 / 3')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('PREVIOUS'));
+    expect(handlePageChange).toHaveBeenCalledWith(1);
+
+    fireEvent.click(screen.getByText('NEXT PAGE'));
+    expect(handlePageChange).toHaveBeenCalledWith(3);
+  });
+});
+
 // ── useOrderFilter 모킹 ───────────────────────────────────────────────────────
 // useSearchParams(next/navigation)를 내부에서 사용하므로 훅 전체를 모킹
 
