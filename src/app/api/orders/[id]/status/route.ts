@@ -9,7 +9,7 @@ type SupabaseAdmin = ReturnType<typeof getSupabaseAdmin>
 type OrderRow = Tables<'orders'>
 type OrderStatusSnapshot = Pick<
   OrderRow,
-  'order_status' | 'payment_status' | 'shipping_status' | 'stock_status'
+  'order_number' | 'order_status' | 'payment_status' | 'shipping_status' | 'stock_status'
 >
 type OrderItemSnapshot = Pick<Tables<'order_items'>, 'product_id' | 'quantity'>
 type StockSnapshot = Pick<Tables<'stocks'>, 'product_id' | 'total' | 'sold'>
@@ -86,7 +86,7 @@ function getDesiredStockStatus(action: StockAction) {
 async function getCurrentOrderStatus(supabaseAdmin: SupabaseAdmin, id: string) {
   const { data, error } = await supabaseAdmin
     .from('orders')
-    .select('order_status, payment_status, shipping_status, stock_status')
+    .select('order_number, order_status, payment_status, shipping_status, stock_status')
     .eq('id', id)
     .single()
 
@@ -194,6 +194,7 @@ async function applyStockAction(
 ) {
   const grouped = groupItemsByProduct(items)
   const nextStockStatus = getDesiredStockStatus(action)
+  const orderCode = currentStatus.order_number
 
   for (const [productId, quantity] of grouped) {
     const stock = await readStockRow(supabaseAdmin, productId)
@@ -209,7 +210,7 @@ async function applyStockAction(
       }
 
       await updateStockRow(supabaseAdmin, productId, stock.total, stock.sold + quantity)
-      await insertStockHistory(supabaseAdmin, productId, 'out', quantity, `주문 예약: ${orderId}`)
+      await insertStockHistory(supabaseAdmin, productId, 'out', quantity, orderCode)
       continue
     }
 
@@ -235,7 +236,7 @@ async function applyStockAction(
         await updateStockRow(supabaseAdmin, productId, stock.total - quantity, stock.sold)
       }
 
-      await insertStockHistory(supabaseAdmin, productId, 'out', quantity, `주문 출고: ${orderId}`)
+      await insertStockHistory(supabaseAdmin, productId, 'out', quantity, orderCode)
       continue
     }
 
@@ -253,7 +254,7 @@ async function applyStockAction(
       await updateStockRow(supabaseAdmin, productId, stock.total + quantity, stock.sold)
     }
 
-    await insertStockHistory(supabaseAdmin, productId, 'in', quantity, `주문 반품 완료: ${orderId}`)
+    await insertStockHistory(supabaseAdmin, productId, 'in', quantity, orderCode)
   }
 
   const { error } = await supabaseAdmin
@@ -395,7 +396,7 @@ export async function PATCH(
       p_shipping_status: parsed.data.shipping_status ?? null,
       p_actor_type: 'admin',
       p_actor_name: actorName,
-      p_reason: null,
+      p_reason: currentStatus.order_number,
     })
 
     if (error) {

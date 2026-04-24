@@ -1822,7 +1822,7 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
                             <td className={`py-xs text-right font-medium whitespace-nowrap ${h.type === 'in' ? 'text-light-success dark:text-dark-success' : 'text-light-error dark:text-dark-error'}`}>
                               {h.type === 'in' ? '+' : '-'}{h.quantity}
                             </td>
-                            <td className="py-xs text-light-textSecondary dark:text-dark-textSecondary">{currentProduct?.productCode ?? '-'}</td>
+                            <td className="py-xs text-light-textSecondary dark:text-dark-textSecondary">{h.reason ?? '-'}</td>
                             <td className="py-xs text-light-textSecondary dark:text-dark-textSecondary whitespace-nowrap">{h.operator}</td>
                           </tr>
                         ))}

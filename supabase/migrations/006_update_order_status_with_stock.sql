@@ -112,7 +112,7 @@ BEGIN
       WHERE product_id = v_item.product_id;
 
       INSERT INTO stock_histories (product_id, type, quantity, reason)
-      VALUES (v_item.product_id, 'out', v_item.quantity, '주문 예약: ' || p_order_id::text);
+      VALUES (v_item.product_id, 'out', v_item.quantity, p_reason);
     ELSIF v_action = 'finalize' THEN
       IF v_stock.total < v_item.quantity THEN
         RAISE EXCEPTION 'insufficient_stock:%', v_stock.total USING ERRCODE = 'P0001';
@@ -131,7 +131,7 @@ BEGIN
       END IF;
 
       INSERT INTO stock_histories (product_id, type, quantity, reason)
-      VALUES (v_item.product_id, 'out', v_item.quantity, '주문 출고: ' || p_order_id::text);
+      VALUES (v_item.product_id, 'out', v_item.quantity, p_reason);
     ELSIF v_action = 'restock' THEN
       IF v_order.stock_status = 'applied' AND v_order.shipping_status = 'shipping_in_progress' THEN
         UPDATE stocks
@@ -144,7 +144,7 @@ BEGIN
       END IF;
 
       INSERT INTO stock_histories (product_id, type, quantity, reason)
-      VALUES (v_item.product_id, 'in', v_item.quantity, '주문 반품 완료: ' || p_order_id::text);
+      VALUES (v_item.product_id, 'in', v_item.quantity, p_reason);
     END IF;
   END LOOP;
 

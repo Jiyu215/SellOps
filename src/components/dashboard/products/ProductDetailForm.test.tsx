@@ -36,7 +36,7 @@ jest.mock('@/services/productDetailService', () => ({
   adjustStock:      jest.fn().mockResolvedValue({ total: 210, sold: 1580, available: 152 }),
   getStockHistory:  jest.fn().mockResolvedValue({
     items: [
-      { id: 'sh-001', type: 'in', quantity: 100, reason: '초기 입고', operator: '김운영', createdAt: '2024-01-15T14:30:00.000Z' },
+      { id: 'sh-001', type: 'in', quantity: 100, reason: '초기 입고', orderNumber: 'SO-2026-000123', operator: '김운영', createdAt: '2024-01-15T14:30:00.000Z' },
     ],
     total: 1,
   }),
@@ -106,7 +106,7 @@ beforeEach(() => {
   service.adjustStock.mockResolvedValue({ total: 210, sold: 1580, available: 152 });
   service.getStockHistory.mockResolvedValue({
     items: [
-      { id: 'sh-001', type: 'in', quantity: 100, reason: '초기 입고', operator: '김운영', createdAt: '2024-01-15T14:30:00.000Z' },
+      { id: 'sh-001', type: 'in', quantity: 100, reason: '초기 입고', orderNumber: 'SO-2026-000123', operator: '김운영', createdAt: '2024-01-15T14:30:00.000Z' },
     ],
     total: 1,
   });
@@ -646,7 +646,7 @@ describe('재고 관리', () => {
     const histBtn = screen.getByRole('button', { name: /재고 이력 보기/ });
     fireEvent.click(histBtn);
     await waitFor(() => {
-      expect(screen.getByText('KB-MXS-BLK')).toBeInTheDocument();
+      expect(screen.getByText('SO-2026-000123')).toBeInTheDocument();
     });
   });
 
@@ -655,11 +655,11 @@ describe('재고 관리', () => {
     const histBtn = screen.getByRole('button', { name: /재고 이력 보기/ });
     fireEvent.click(histBtn);
     await waitFor(() => {
-      expect(screen.getByText('KB-MXS-BLK')).toBeInTheDocument();
+      expect(screen.getByText('SO-2026-000123')).toBeInTheDocument();
     });
     fireEvent.click(histBtn);
     await waitFor(() => {
-      expect(screen.queryByText('KB-MXS-BLK')).not.toBeInTheDocument();
+      expect(screen.queryByText('SO-2026-000123')).not.toBeInTheDocument();
     });
   });
 });

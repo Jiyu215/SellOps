@@ -77,6 +77,7 @@ function makeRequest(body: unknown, orderId = 'order-001') {
 
 type MockOptions = {
   currentOrder?: {
+    order_number: string
     order_status: string
     payment_status: string
     shipping_status: string
@@ -90,6 +91,7 @@ type MockOptions = {
 
 function makeSupabaseAdminMock(options: MockOptions = {}) {
   const currentOrder = options.currentOrder ?? {
+    order_number: 'SO-2026-000001',
     order_status: 'order_confirmed',
     payment_status: 'payment_completed',
     shipping_status: 'shipping_ready',
@@ -270,6 +272,7 @@ describe('PATCH /api/orders/[id]/status', () => {
   test('fallback reserve updates sold once and marks stock as applied', async () => {
     const { rpc, stocksUpdate, stockHistoryInsert } = makeSupabaseAdminMock({
       currentOrder: {
+        order_number: 'SO-2026-000001',
         order_status: 'order_waiting',
         payment_status: 'payment_pending',
         shipping_status: 'shipping_ready',
@@ -287,7 +290,7 @@ describe('PATCH /api/orders/[id]/status', () => {
       product_id: 'product-001',
       type: 'out',
       quantity: 2,
-      reason: '주문 예약: order-001',
+      reason: 'SO-2026-000001',
     })
     expect(rpc).toHaveBeenCalledWith('update_order_status_with_stock', expect.anything())
   })
@@ -295,6 +298,7 @@ describe('PATCH /api/orders/[id]/status', () => {
   test('fallback finalize reduces total once and keeps available stable after reserve', async () => {
     const { rpc, stocksUpdate, stockHistoryInsert } = makeSupabaseAdminMock({
       currentOrder: {
+        order_number: 'SO-2026-000001',
         order_status: 'order_confirmed',
         payment_status: 'payment_completed',
         shipping_status: 'shipping_in_progress',
@@ -316,7 +320,7 @@ describe('PATCH /api/orders/[id]/status', () => {
       product_id: 'product-001',
       type: 'out',
       quantity: 2,
-      reason: '주문 출고: order-001',
+      reason: 'SO-2026-000001',
     })
     expect(rpc).toHaveBeenCalledWith('update_order_status_with_stock', expect.anything())
   })
