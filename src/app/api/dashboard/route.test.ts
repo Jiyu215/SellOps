@@ -111,13 +111,42 @@ function createDemandOrdersQueryResult() {
   };
 }
 
+function createCompletedOrdersForTopProductsQueryResult() {
+  return {
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    neq: jest.fn().mockReturnThis(),
+    gte: jest.fn().mockResolvedValue({
+      data: [
+        { id: 'o1', created_at: '2026-04-24T10:00:00.000Z' },
+        { id: 'o2', created_at: '2026-04-23T10:00:00.000Z' },
+      ],
+      error: null,
+    }),
+  };
+}
+
 function createOrderItemsQueryResult() {
   return {
     select: jest.fn().mockReturnThis(),
     in: jest.fn().mockResolvedValue({
       data: [
-        { product_id: 'p1', quantity: 90 },
-        { product_id: 'p2', quantity: 60 },
+        {
+          order_id: 'o1',
+          product_id: 'p1',
+          product_name: '키보드',
+          product_code: 'PRD-001',
+          price: 1000,
+          quantity: 90,
+        },
+        {
+          order_id: 'o2',
+          product_id: 'p2',
+          product_name: '마우스',
+          product_code: 'PRD-002',
+          price: 2000,
+          quantity: 60,
+        },
       ],
       error: null,
     }),
@@ -143,8 +172,9 @@ describe('GET /api/dashboard', () => {
     const countQuery = createTodayOrderCountQueryResult();
     const productsQuery = createProductsQueryResult();
     const demandOrdersQuery = createDemandOrdersQueryResult();
+    const topProductOrdersQuery = createCompletedOrdersForTopProductsQueryResult();
     const orderItemsQuery = createOrderItemsQueryResult();
-    const ordersQueue = [revenueQuery, countQuery, demandOrdersQuery];
+    const ordersQueue = [revenueQuery, countQuery, demandOrdersQuery, topProductOrdersQuery];
 
     const mockSupabaseAdmin = {
       from: jest.fn().mockImplementation((table: string) => {
@@ -187,6 +217,11 @@ describe('GET /api/dashboard', () => {
       inventoryItems: Array<{ sku: string; currentStock: number }>;
       orders: Array<{ orderNumber: string }>;
       ordersPagination: { total: number; page: number; limit: number };
+      topProducts: {
+        today: Array<{ sku: string; revenue: number }>;
+        week: Array<{ sku: string; revenue: number }>;
+        month: Array<{ sku: string; revenue: number }>;
+      };
     };
 
     expect(response.status).toBe(200);
@@ -195,6 +230,9 @@ describe('GET /api/dashboard', () => {
     expect(revenueQuery.eq).toHaveBeenCalledWith('payment_status', 'payment_completed');
     expect(revenueQuery.neq).toHaveBeenCalledWith('shipping_status', 'return_completed');
     expect(demandOrdersQuery.eq).toHaveBeenCalledWith('order_status', 'order_completed');
+    expect(topProductOrdersQuery.eq).toHaveBeenCalledWith('payment_status', 'payment_completed');
+    expect(topProductOrdersQuery.eq).toHaveBeenCalledWith('shipping_status', 'shipping_completed');
+    expect(topProductOrdersQuery.neq).toHaveBeenCalledWith('order_status', 'order_cancelled');
     expect(orderItemsQuery.in).toHaveBeenCalledWith('order_id', ['o1', 'o2']);
     expect(mockGetOrders).toHaveBeenCalledWith(
       mockSupabaseAdmin,
@@ -226,5 +264,8 @@ describe('GET /api/dashboard', () => {
       page: 2,
       limit: 5,
     });
+    expect(body.topProducts.today).toEqual([
+      expect.objectContaining({ sku: 'PRD-001', revenue: 90000 }),
+    ]);
   });
 });

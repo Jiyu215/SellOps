@@ -6,12 +6,17 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { orderListQuerySchema } from '@/features/orders/schemas/order.schema'
 import type { OrderListQuery, OrderListResponse } from '@/features/orders/types/order.type'
 import type { Database } from '@/types/supabase'
-import type { InventoryItem, KPICardData, RiskLevel } from '@/types/dashboard'
+import type {
+  InventoryItem,
+  KPICardData,
+  RiskLevel,
+  TopProductItem,
+  TopProductPeriod,
+} from '@/types/dashboard'
 import {
   MOCK_CATEGORY_DATA,
   MOCK_DAILY_DATA,
   MOCK_SALES_DATA,
-  MOCK_TOP_PRODUCTS,
 } from '@/constants/mockData'
 
 const DASHBOARD_LOW_STOCK_LIMIT = 6
@@ -37,7 +42,37 @@ type RevenueOrderRow = {
   total_amount: number
 }
 
+type CompletedOrderRow = {
+  id: string
+  created_at: string | null
+}
+
+type OrderItemSalesRow = {
+  order_id: string
+  product_id: string
+  product_name: string
+  product_code: string | null
+  price: number
+  quantity: number
+}
+
 type DashboardSupabaseClient = SupabaseClient<Database>
+
+type PeriodRange = {
+  currentStart: Date
+  currentEnd: Date
+  previousStart: Date
+  previousEnd: Date
+}
+
+type ProductAggregate = {
+  id: string
+  productName: string
+  sku: string
+  category: string
+  revenue: number
+  unitsSold: number
+}
 
 function getKstTodayRange() {
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -73,6 +108,50 @@ function getAnalysisWindowStart() {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('ko-KR').format(value)
+}
+
+function createPeriodRange(days: number, end: Date): PeriodRange {
+  const currentEnd = new Date(end)
+  const currentStart = new Date(end)
+  currentStart.setDate(currentStart.getDate() - days)
+
+  const previousEnd = new Date(currentStart)
+  const previousStart = new Date(currentStart)
+  previousStart.setDate(previousStart.getDate() - days)
+
+  return {
+    currentStart,
+    currentEnd,
+    previousStart,
+    previousEnd,
+  }
+}
+
+function getTopProductRanges(): Record<TopProductPeriod, PeriodRange> {
+  const now = new Date()
+  const today = getKstTodayRange()
+  const todayStart = new Date(today.start)
+  const todayEnd = new Date(today.end)
+
+  return {
+    today: {
+      currentStart: todayStart,
+      currentEnd: todayEnd,
+      previousStart: new Date(todayStart.getTime() - 24 * 60 * 60 * 1000),
+      previousEnd: todayStart,
+    },
+    week: createPeriodRange(7, now),
+    month: createPeriodRange(30, now),
+  }
+}
+
+function inRange(target: Date, start: Date, end: Date) {
+  return target >= start && target < end
+}
+
+function toPercentChange(currentRevenue: number, previousRevenue: number) {
+  if (previousRevenue <= 0) return undefined
+  return Number((((currentRevenue - previousRevenue) / previousRevenue) * 100).toFixed(1))
 }
 
 function getDemandStats(totalDemand: number) {
@@ -203,6 +282,135 @@ async function getInventoryStats(supabaseAdmin: DashboardSupabaseClient) {
   }
 }
 
+async function getCompletedOrdersForTopProducts(supabaseAdmin: DashboardSupabaseClient) {
+  const ranges = getTopProductRanges()
+  const earliestStart = new Date(
+    Math.min(
+      ...Object.values(ranges).map((range) => range.previousStart.getTime()),
+    ),
+  ).toISOString()
+
+  const { data, error } = await supabaseAdmin
+    .from('orders')
+    .select('id, created_at')
+    .eq('payment_status', 'payment_completed')
+    .eq('shipping_status', 'shipping_completed')
+    .neq('order_status', 'order_cancelled')
+    .gte('created_at', earliestStart)
+
+  if (error) throw error
+
+  return (data ?? []) as CompletedOrderRow[]
+}
+
+function aggregateProductSales(
+  itemRows: OrderItemSalesRow[],
+  orderIds: Set<string>,
+) {
+  const aggregateMap = new Map<string, ProductAggregate>()
+
+  for (const row of itemRows) {
+    if (!orderIds.has(row.order_id)) continue
+
+    const current = aggregateMap.get(row.product_id) ?? {
+      id: row.product_id,
+      productName: row.product_name,
+      sku: row.product_code ?? row.product_id,
+      category: '미분류',
+      revenue: 0,
+      unitsSold: 0,
+    }
+
+    current.revenue += row.price * row.quantity
+    current.unitsSold += row.quantity
+    aggregateMap.set(row.product_id, current)
+  }
+
+  return aggregateMap
+}
+
+function toTopProductList(
+  currentMap: Map<string, ProductAggregate>,
+  previousMap: Map<string, ProductAggregate>,
+): TopProductItem[] {
+  return [...currentMap.values()]
+    .sort((a, b) => {
+      if (b.revenue !== a.revenue) return b.revenue - a.revenue
+      if (b.unitsSold !== a.unitsSold) return b.unitsSold - a.unitsSold
+      return a.productName.localeCompare(b.productName)
+    })
+    .slice(0, 5)
+    .map((product, index) => {
+      const previousRevenue = previousMap.get(product.id)?.revenue ?? 0
+
+      return {
+        id: product.id,
+        rank: index + 1,
+        productName: product.productName,
+        sku: product.sku,
+        category: product.category,
+        revenue: product.revenue,
+        unitsSold: product.unitsSold,
+        changePercent: toPercentChange(product.revenue, previousRevenue),
+      }
+    })
+}
+
+async function getTopProducts(supabaseAdmin: DashboardSupabaseClient) {
+  const ranges = getTopProductRanges()
+  const completedOrders = await getCompletedOrdersForTopProducts(supabaseAdmin)
+
+  if (completedOrders.length === 0) {
+    return {
+      today: [],
+      week: [],
+      month: [],
+    } as Record<TopProductPeriod, TopProductItem[]>
+  }
+
+  const orderIds = completedOrders.map((order) => order.id)
+  const { data: orderItemRows, error: orderItemError } = await supabaseAdmin
+    .from('order_items')
+    .select('order_id, product_id, product_name, product_code, price, quantity')
+    .in('order_id', orderIds)
+
+  if (orderItemError) throw orderItemError
+
+  const itemRows = (orderItemRows ?? []) as OrderItemSalesRow[]
+
+  const ordersByRange = Object.fromEntries(
+    Object.entries(ranges).map(([period, range]) => {
+      const currentIds = new Set(
+        completedOrders
+          .filter((order) => order.created_at && inRange(new Date(order.created_at), range.currentStart, range.currentEnd))
+          .map((order) => order.id),
+      )
+      const previousIds = new Set(
+        completedOrders
+          .filter((order) => order.created_at && inRange(new Date(order.created_at), range.previousStart, range.previousEnd))
+          .map((order) => order.id),
+      )
+
+      return [period, { currentIds, previousIds }]
+    }),
+  ) as Record<TopProductPeriod, { currentIds: Set<string>; previousIds: Set<string> }>
+
+  return {
+    today: toTopProductList(
+      aggregateProductSales(itemRows, ordersByRange.today.currentIds),
+      aggregateProductSales(itemRows, ordersByRange.today.previousIds),
+    ),
+    week: toTopProductList(
+      aggregateProductSales(itemRows, ordersByRange.week.currentIds),
+      aggregateProductSales(itemRows, ordersByRange.week.previousIds),
+    ),
+    month: toTopProductList(
+      aggregateProductSales(itemRows, ordersByRange.month.currentIds),
+      aggregateProductSales(itemRows, ordersByRange.month.previousIds),
+    ),
+  } satisfies Record<TopProductPeriod, TopProductItem[]>
+}
+
 function parseDashboardOrderQuery(request: Request):
   | { ok: true; query: OrderListQuery }
   | { ok: false; response: Response } {
@@ -251,11 +459,12 @@ export async function GET(request: Request) {
 
   try {
     const supabaseAdmin = getSupabaseAdmin()
-    const [todayRevenueOrders, todayOrderCount, inventoryStats, orderResult] = await Promise.all([
+    const [todayRevenueOrders, todayOrderCount, inventoryStats, orderResult, topProducts] = await Promise.all([
       getTodayRevenueOrders(supabaseAdmin),
       getTodayOrderCount(supabaseAdmin),
       getInventoryStats(supabaseAdmin),
       getDashboardOrders(supabaseAdmin, parsedQuery.query),
+      getTopProducts(supabaseAdmin),
     ])
     const todayRevenueTotal = todayRevenueOrders.reduce((sum, order) => sum + order.total_amount, 0)
 
@@ -298,7 +507,7 @@ export async function GET(request: Request) {
         page: orderResult.page,
         limit: orderResult.limit,
       },
-      topProducts: MOCK_TOP_PRODUCTS,
+      topProducts,
     })
   } catch {
     return NextResponse.json(
