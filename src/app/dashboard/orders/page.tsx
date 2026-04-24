@@ -1,7 +1,8 @@
 import { Suspense } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
-import { MOCK_NOTIFICATIONS, MOCK_USER } from '@/constants/mockData';
+import { MOCK_NOTIFICATIONS } from '@/constants/mockData';
 import { getOrders } from '@/dal/orders';
+import { getDashboardUser } from '@/lib/dashboard/currentUser';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { OrdersContent } from './OrdersContent';
 import { OrdersPageSkeleton } from './OrdersPageSkeleton';
@@ -31,6 +32,7 @@ function parsePage(value: string | undefined) {
 }
 
 export default async function OrdersPage({ searchParams }: OrdersPageProps) {
+  const currentUser = await getDashboardUser();
   const params = await searchParams ?? {};
   const query: OrderListQuery = {
     search:         getParam(params, 'order_search') ?? '',
@@ -45,7 +47,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
 
   return (
     <DashboardLayout
-      currentUser={MOCK_USER}
+      currentUser={currentUser}
       pageTitle="주문 관리"
       notifications={MOCK_NOTIFICATIONS}
     >

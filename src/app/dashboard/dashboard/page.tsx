@@ -1,6 +1,7 @@
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { DashboardContent } from '@/components/dashboard/DashboardContent';
-import { MOCK_USER, MOCK_NOTIFICATIONS } from '@/constants/mockData';
+import { MOCK_NOTIFICATIONS } from '@/constants/mockData';
+import { getDashboardUser } from '@/lib/dashboard/currentUser';
 
 /**
  * 대시보드 메인 페이지 (Server Component)
@@ -10,10 +11,12 @@ import { MOCK_USER, MOCK_NOTIFICATIONS } from '@/constants/mockData';
  *   → 데이터 준비 전: DashboardSkeleton 표시
  *   → 데이터 준비 후: 차트·테이블·카드 렌더링
  */
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const currentUser = await getDashboardUser();
+
   return (
     <DashboardLayout
-      currentUser={MOCK_USER}
+      currentUser={currentUser}
       pageTitle="대시보드"
       notifications={MOCK_NOTIFICATIONS}
     >

@@ -1,7 +1,8 @@
 import { Suspense } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
-import { MOCK_USER, MOCK_NOTIFICATIONS } from '@/constants/mockData';
+import { MOCK_NOTIFICATIONS } from '@/constants/mockData';
 import { ProductDetailForm } from '@/components/dashboard/products/ProductDetailForm';
+import { getDashboardUser } from '@/lib/dashboard/currentUser';
 import { ProductDetailSkeleton } from '../[id]/ProductDetailSkeleton';
 
 export const metadata = {
@@ -14,10 +15,12 @@ export const metadata = {
  * - product prop 없음 → isNew=true
  * - ProductDetailForm이 클라이언트 컴포넌트이므로 Suspense로 감쌈.
  */
-export default function ProductNewPage() {
+export default async function ProductNewPage() {
+  const currentUser = await getDashboardUser();
+
   return (
     <DashboardLayout
-      currentUser={MOCK_USER}
+      currentUser={currentUser}
       pageTitle="새 상품 등록"
       notifications={MOCK_NOTIFICATIONS}
       nativeScroll

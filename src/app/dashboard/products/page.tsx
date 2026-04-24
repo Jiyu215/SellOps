@@ -1,8 +1,9 @@
 import { Suspense } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
-import { MOCK_USER, MOCK_NOTIFICATIONS } from '@/constants/mockData';
+import { MOCK_NOTIFICATIONS } from '@/constants/mockData';
 import { ProductsContent } from './ProductsContent';
 import { ProductsPageSkeleton } from './ProductsPageSkeleton';
+import { getDashboardUser } from '@/lib/dashboard/currentUser';
 import { createClient } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import type { ProductListItem, ProductStatus } from '@/types/products';
@@ -14,6 +15,7 @@ import type { ProductListItem, ProductStatus } from '@/types/products';
  * - revalidatePath 후 서버 재렌더 시 최신 목록 자동 반영
  */
 export default async function ProductsPage() {
+  const currentUser = await getDashboardUser();
   const supabase = await createClient();
 
   const { data: items } = await supabase
@@ -60,7 +62,7 @@ export default async function ProductsPage() {
 
   return (
     <DashboardLayout
-      currentUser={MOCK_USER}
+      currentUser={currentUser}
       pageTitle="상품 관리"
       notifications={MOCK_NOTIFICATIONS}
     >

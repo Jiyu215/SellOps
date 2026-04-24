@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
-import { MOCK_USER, MOCK_NOTIFICATIONS } from '@/constants/mockData';
+import { MOCK_NOTIFICATIONS } from '@/constants/mockData';
 import { getProductById } from '@/dal/products';
+import { getDashboardUser } from '@/lib/dashboard/currentUser';
 import { ProductDetailContent } from './ProductDetailContent';
 import { ProductDetailSkeleton } from './ProductDetailSkeleton';
 
@@ -27,12 +28,13 @@ export async function generateMetadata({ params }: ProductDetailPageProps) {
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   const { id }  = await params;
   const product = await getProductById(id);
+  const currentUser = await getDashboardUser();
 
   if (!product) notFound();
 
   return (
     <DashboardLayout
-      currentUser={MOCK_USER}
+      currentUser={currentUser}
       pageTitle={product.name}
       notifications={MOCK_NOTIFICATIONS}
       nativeScroll
