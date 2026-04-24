@@ -7,6 +7,7 @@ import { orderListQuerySchema } from '@/features/orders/schemas/order.schema';
 import type { OrderListQuery, OrderListResponse } from '@/features/orders/types/order.type';
 import type { Database } from '@/types/supabase';
 import type {
+  CategoryDataPoint,
   DailyDataPoint,
   InventoryItem,
   KPICardData,
@@ -15,13 +16,13 @@ import type {
   TopProductItem,
   TopProductPeriod,
 } from '@/types/dashboard';
-import { MOCK_CATEGORY_DATA } from '@/constants/mockData';
 
 const DASHBOARD_LOW_STOCK_LIMIT = 6;
 const DASHBOARD_RECENT_ORDER_LIMIT = 5;
 const ANALYSIS_WINDOW_DAYS = 30;
 const LEAD_TIME_DAYS = 7;
 const SAFETY_STOCK_DAYS = 3;
+const CATEGORY_CHART_COLORS = ['#5D5FEF', '#28A745', '#FFC107', '#17A2B8', '#DC3545', '#6C757D'];
 
 type ProductWithStockRow = {
   id: string | null;
@@ -66,6 +67,16 @@ type OrderItemSalesRow = {
   quantity: number;
 };
 
+type ProductCategoryRow = {
+  id: string;
+  category_id: string | null;
+};
+
+type CategoryRow = {
+  id: string;
+  name: string;
+};
+
 type DashboardSupabaseClient = SupabaseClient<Database>;
 
 type PeriodRange = {
@@ -103,6 +114,30 @@ function getKstTodayRange() {
   const start = new Date(`${year}-${month}-${day}T00:00:00+09:00`);
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
+
+  return {
+    start: start.toISOString(),
+    end: end.toISOString(),
+  };
+}
+
+function getKstCurrentMonthRange() {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+  });
+  const parts = formatter.formatToParts(new Date());
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+
+  if (!year || !month) {
+    throw new Error('KST month range creation failed');
+  }
+
+  const start = new Date(`${year}-${month}-01T00:00:00+09:00`);
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + 1);
 
   return {
     start: start.toISOString(),
@@ -215,6 +250,47 @@ function inRange(target: Date, start: Date, end: Date) {
 function toPercentChange(currentRevenue: number, previousRevenue: number) {
   if (previousRevenue <= 0) return undefined;
   return Number((((currentRevenue - previousRevenue) / previousRevenue) * 100).toFixed(1));
+}
+
+function toCategoryPercentages(
+  items: Array<{ name: string; revenue: number }>,
+): CategoryDataPoint[] {
+  const totalRevenue = items.reduce((sum, item) => sum + item.revenue, 0);
+
+  if (totalRevenue <= 0) {
+    return items.map((item, index) => ({
+      name: item.name,
+      value: 0,
+      color: CATEGORY_CHART_COLORS[index % CATEGORY_CHART_COLORS.length],
+    }));
+  }
+
+  const percentages = items.map((item, index) => {
+    const raw = (item.revenue / totalRevenue) * 100;
+    const value = Math.floor(raw);
+
+    return {
+      index,
+      name: item.name,
+      value,
+      remainder: raw - value,
+    };
+  });
+
+  let remaining = 100 - percentages.reduce((sum, item) => sum + item.value, 0);
+  const byRemainder = [...percentages].sort((a, b) => b.remainder - a.remainder);
+
+  for (let index = 0; index < byRemainder.length && remaining > 0; index += 1) {
+    byRemainder[index].value += 1;
+    remaining -= 1;
+  }
+
+  return percentages
+    .map((item, index) => ({
+      name: item.name,
+      value: item.value,
+      color: CATEGORY_CHART_COLORS[index % CATEGORY_CHART_COLORS.length],
+    }));
 }
 
 function getDemandStats(totalDemand: number) {
@@ -447,6 +523,84 @@ async function getMonthlySalesData(supabaseAdmin: DashboardSupabaseClient): Prom
   });
 }
 
+async function getCategoryData(
+  supabaseAdmin: DashboardSupabaseClient,
+): Promise<CategoryDataPoint[]> {
+  const { start, end } = getKstCurrentMonthRange();
+  const { data: categoryRows, error: categoryListError } = await supabaseAdmin
+    .from('categories')
+    .select('id, name')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+    .order('name', { ascending: true });
+
+  if (categoryListError) throw categoryListError;
+
+  const categories = (categoryRows ?? []) as CategoryRow[];
+
+  const { data: orders, error: orderError } = await supabaseAdmin
+    .from('orders')
+    .select('id')
+    .eq('payment_status', 'payment_completed')
+    .eq('shipping_status', 'shipping_completed')
+    .neq('order_status', 'order_cancelled')
+    .gte('created_at', start)
+    .lt('created_at', end);
+
+  if (orderError) throw orderError;
+
+  const orderIds = (orders ?? []).map((order) => order.id);
+  const revenueByCategory = new Map<string, number>(
+    [...categories.map((category) => [category.name, 0] as const), ['미분류', 0]],
+  );
+
+  if (orderIds.length === 0) {
+    return toCategoryPercentages(
+      [...revenueByCategory.entries()].map(([name, revenue]) => ({ name, revenue })),
+    );
+  }
+
+  const { data: orderItems, error: orderItemError } = await supabaseAdmin
+    .from('order_items')
+    .select('order_id, product_id, price, quantity')
+    .in('order_id', orderIds);
+
+  if (orderItemError) throw orderItemError;
+
+  const productIds = [...new Set((orderItems ?? []).map((item) => item.product_id))];
+  if (productIds.length === 0) {
+    return [];
+  }
+
+  const { data: products, error: productError } = await supabaseAdmin
+    .from('products')
+    .select('id, category_id')
+    .in('id', productIds);
+
+  if (productError) throw productError;
+
+  const productCategoryMap = new Map<string, string | null>(
+    ((products ?? []) as ProductCategoryRow[]).map((product) => [product.id, product.category_id]),
+  );
+  const categoryNameMap = new Map<string, string>(
+    categories.map((category) => [category.id, category.name]),
+  );
+
+  for (const item of (orderItems ?? []) as Array<Pick<OrderItemSalesRow, 'product_id' | 'price' | 'quantity'>>) {
+    const categoryId = productCategoryMap.get(item.product_id) ?? null;
+    const categoryName = categoryId ? (categoryNameMap.get(categoryId) ?? '미분류') : '미분류';
+    const revenue = item.price * item.quantity;
+
+    revenueByCategory.set(categoryName, (revenueByCategory.get(categoryName) ?? 0) + revenue);
+  }
+
+  const sorted = [...revenueByCategory.entries()]
+    .map(([name, revenue]) => ({ name, revenue }))
+    .sort((a, b) => b.revenue - a.revenue);
+
+  return toCategoryPercentages(sorted);
+}
+
 async function getCompletedOrdersForTopProducts(supabaseAdmin: DashboardSupabaseClient) {
   const ranges = getTopProductRanges();
   const earliestStart = new Date(
@@ -621,7 +775,7 @@ export async function GET(request: Request) {
 
   try {
     const supabaseAdmin = getSupabaseAdmin();
-    const [todayRevenueOrders, todayOrderCount, inventoryStats, orderResult, topProducts, dailyData, salesData] = await Promise.all([
+    const [todayRevenueOrders, todayOrderCount, inventoryStats, orderResult, topProducts, dailyData, salesData, categoryData] = await Promise.all([
       getTodayRevenueOrders(supabaseAdmin),
       getTodayOrderCount(supabaseAdmin),
       getInventoryStats(supabaseAdmin),
@@ -629,6 +783,7 @@ export async function GET(request: Request) {
       getTopProducts(supabaseAdmin),
       getShortTermDailyData(supabaseAdmin),
       getMonthlySalesData(supabaseAdmin),
+      getCategoryData(supabaseAdmin),
     ]);
 
     const todayRevenueTotal = todayRevenueOrders.reduce((sum, order) => sum + order.total_amount, 0);
@@ -664,7 +819,7 @@ export async function GET(request: Request) {
       kpiData,
       dailyData,
       salesData,
-      categoryData: MOCK_CATEGORY_DATA,
+      categoryData,
       inventoryItems: inventoryStats.inventoryItems,
       orders: orderResult.items,
       ordersPagination: {

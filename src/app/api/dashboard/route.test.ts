@@ -183,6 +183,44 @@ function createOrderItemsQueryResult() {
   };
 }
 
+function createCategoryOrdersQueryResult() {
+  return {
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    neq: jest.fn().mockReturnThis(),
+    gte: jest.fn().mockReturnThis(),
+    lt: jest.fn().mockResolvedValue({
+      data: [{ id: 'o1' }, { id: 'o2' }],
+      error: null,
+    }),
+  };
+}
+
+function createProductsCategoryQueryResult() {
+  return {
+    select: jest.fn().mockReturnThis(),
+    in: jest.fn().mockResolvedValue({
+      data: [
+        { id: 'p1', category_id: 'c1' },
+        { id: 'p2', category_id: null },
+      ],
+      error: null,
+    }),
+  };
+}
+
+function createCategoriesQueryResult() {
+  return {
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    order: jest.fn(),
+    in: jest.fn().mockResolvedValue({
+      data: [{ id: 'c1', name: '입력장치' }],
+      error: null,
+    }),
+  };
+}
+
 describe('GET /api/dashboard', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -205,21 +243,29 @@ describe('GET /api/dashboard', () => {
     const shortTermOrdersQuery = createShortTermOrdersQueryResult();
     const monthlySalesOrdersQuery = createMonthlySalesOrdersQueryResult();
     const secondDemandOrdersQuery = createDemandOrdersQueryResult();
+    const categoryOrdersQuery = createCategoryOrdersQueryResult();
     const productsQuery = createProductsQueryResult();
+    const productCategoryQuery = createProductsCategoryQueryResult();
+    const categoriesQuery = createCategoriesQueryResult();
     const orderItemsQuery = createOrderItemsQueryResult();
+    let idSelectCount = 0;
 
     const mockSupabaseAdmin = {
       from: jest.fn().mockImplementation((table: string) => {
         if (table === 'products_with_stock') return productsQuery;
         if (table === 'order_items') return orderItemsQuery;
+        if (table === 'products') return productCategoryQuery;
+        if (table === 'categories') return categoriesQuery;
         if (table === 'orders') {
           const query = {
             select(selection: string, options?: unknown) {
               if (options && typeof options === 'object') return countQuery;
               if (selection === 'id, total_amount') return revenueQuery;
               if (selection === 'id') {
-                if (!demandOrdersQuery.gte.mock.calls.length) return demandOrdersQuery;
-                return secondDemandOrdersQuery;
+                idSelectCount += 1;
+                if (idSelectCount === 1) return demandOrdersQuery;
+                if (idSelectCount === 2) return secondDemandOrdersQuery;
+                return categoryOrdersQuery;
               }
               if (selection === 'id, created_at') return topProductOrdersQuery;
               if (selection === 'id, total_amount, created_at') {
@@ -235,6 +281,14 @@ describe('GET /api/dashboard', () => {
         return undefined;
       }),
     };
+
+    categoriesQuery.order
+      .mockReturnValueOnce({
+        order: jest.fn().mockResolvedValue({
+          data: [{ id: 'c1', name: '입력장치' }],
+          error: null,
+        }),
+      });
 
     mockRequireAuth.mockImplementation(makeAuthedReturn);
     mockGetSupabaseAdmin.mockReturnValue(mockSupabaseAdmin as never);
@@ -267,6 +321,7 @@ describe('GET /api/dashboard', () => {
       kpiData: Array<{ id: string; value: string | number }>;
       dailyData: Array<{ date: string; revenue: number; orders: number; stockRiskCount: number }>;
       salesData: Array<{ month: string; revenue: number; orders: number; target: number }>;
+      categoryData: Array<{ name: string; value: number; color: string }>;
       inventoryItems: Array<{ sku: string; currentStock: number }>;
       orders: Array<{ orderNumber: string }>;
       ordersPagination: { total: number; page: number; limit: number };
@@ -298,7 +353,13 @@ describe('GET /api/dashboard', () => {
     expect(monthlySalesOrdersQuery.eq).toHaveBeenCalledWith('shipping_status', 'shipping_completed');
     expect(monthlySalesOrdersQuery.neq).toHaveBeenCalledWith('order_status', 'order_cancelled');
 
+    expect(categoryOrdersQuery.eq).toHaveBeenCalledWith('payment_status', 'payment_completed');
+    expect(categoryOrdersQuery.eq).toHaveBeenCalledWith('shipping_status', 'shipping_completed');
+    expect(categoryOrdersQuery.neq).toHaveBeenCalledWith('order_status', 'order_cancelled');
+
     expect(orderItemsQuery.in).toHaveBeenCalledWith('order_id', ['o1', 'o2']);
+    expect(productCategoryQuery.in).toHaveBeenCalledWith('id', ['p1', 'p2']);
+    expect(categoriesQuery.eq).toHaveBeenCalledWith('is_active', true);
 
     expect(mockGetOrders).toHaveBeenCalledWith(
       mockSupabaseAdmin,
@@ -332,6 +393,13 @@ describe('GET /api/dashboard', () => {
       ]),
     );
 
+    expect(body.categoryData).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: '입력장치', value: 43 }),
+        expect.objectContaining({ name: '미분류', value: 57 }),
+      ]),
+    );
+
     expect(body.inventoryItems).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ sku: 'PRD-001', currentStock: 3 }),
@@ -347,8 +415,97 @@ describe('GET /api/dashboard', () => {
       limit: 5,
     });
 
-    expect(body.topProducts.today).toEqual([
-      expect.objectContaining({ sku: 'PRD-001', revenue: 90000 }),
+    expect(body.topProducts.today).toEqual([]);
+
+    expect(body.topProducts.week).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ sku: 'PRD-001', revenue: 90000 }),
+      ]),
+    );
+  });
+  test('카테고리 매출이 없어도 활성 카테고리와 미분류를 0%로 반환한다', async () => {
+    const revenueQuery = createRevenueOrdersQueryResult();
+    const countQuery = createTodayOrderCountQueryResult();
+    const demandOrdersQuery = createDemandOrdersQueryResult();
+    const topProductOrdersQuery = createCompletedOrdersForTopProductsQueryResult();
+    const shortTermOrdersQuery = createShortTermOrdersQueryResult();
+    const monthlySalesOrdersQuery = createMonthlySalesOrdersQueryResult();
+    const secondDemandOrdersQuery = createDemandOrdersQueryResult();
+    const categoryOrdersQuery = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      neq: jest.fn().mockReturnThis(),
+      gte: jest.fn().mockReturnThis(),
+      lt: jest.fn().mockResolvedValue({ data: [], error: null }),
+    };
+    const productsQuery = createProductsQueryResult();
+    const categoriesQuery = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      order: jest.fn(),
+    };
+    const orderItemsQuery = createOrderItemsQueryResult();
+    let idSelectCount = 0;
+
+    const mockSupabaseAdmin = {
+      from: jest.fn().mockImplementation((table: string) => {
+        if (table === 'products_with_stock') return productsQuery;
+        if (table === 'order_items') return orderItemsQuery;
+        if (table === 'categories') return categoriesQuery;
+        if (table === 'orders') {
+          return {
+            select(selection: string, options?: unknown) {
+              if (options && typeof options === 'object') return countQuery;
+              if (selection === 'id, total_amount') return revenueQuery;
+              if (selection === 'id') {
+                idSelectCount += 1;
+                if (idSelectCount === 1) return demandOrdersQuery;
+                if (idSelectCount === 2) return secondDemandOrdersQuery;
+                return categoryOrdersQuery;
+              }
+              if (selection === 'id, created_at') return topProductOrdersQuery;
+              if (selection === 'id, total_amount, created_at') {
+                if (!shortTermOrdersQuery.gte.mock.calls.length) return shortTermOrdersQuery;
+                return monthlySalesOrdersQuery;
+              }
+              return undefined;
+            },
+          };
+        }
+        return undefined;
+      }),
+    };
+
+    categoriesQuery.order
+      .mockReturnValueOnce({
+        order: jest.fn().mockResolvedValue({
+          data: [
+            { id: 'c1', name: '입력장치' },
+            { id: 'c2', name: '허브/확장' },
+          ],
+          error: null,
+        }),
+      });
+
+    mockRequireAuth.mockImplementation(makeAuthedReturn);
+    mockGetSupabaseAdmin.mockReturnValue(mockSupabaseAdmin as never);
+    mockGetOrders.mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      limit: 5,
+    });
+
+    const response = await GET(new Request('http://localhost/api/dashboard')) as MockRouteResponse;
+    const body = response.body as {
+      categoryData: Array<{ name: string; value: number }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.categoryData).toEqual([
+      expect.objectContaining({ name: '입력장치', value: 0 }),
+      expect.objectContaining({ name: '허브/확장', value: 0 }),
+      expect.objectContaining({ name: '미분류', value: 0 }),
     ]);
   });
 });

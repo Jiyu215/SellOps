@@ -72,7 +72,7 @@ const CustomLegend = ({ data }: { data: CategoryDataPoint[] }) => (
 export const CategoryDoughnutChart = ({ data }: CategoryDoughnutChartProps) => {
   return (
     <section
-      className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-md p-md flex flex-col h-full"
+      className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-md p-md flex flex-col h-full overflow-visible"
       aria-label="카테고리별 매출 비중"
     >
       {/* 카드 헤더 */}
@@ -98,7 +98,7 @@ export const CategoryDoughnutChart = ({ data }: CategoryDoughnutChartProps) => {
         */}
         <div
           className={[
-            'relative flex-shrink-0',
+            'relative flex-shrink-0 overflow-visible z-10',
             // 너비: col 모드=전체, row 모드=절반
             'w-full sm:w-1/2 lg:w-full xl:w-1/2',
             // 높이: 각 breakpoint 에서 명시 (ResponsiveContainer height="100%" 사용)
@@ -121,7 +121,7 @@ export const CategoryDoughnutChart = ({ data }: CategoryDoughnutChartProps) => {
                   <Cell key={entry.name} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 60 }} />
             </PieChart>
           </ResponsiveContainer>
 
