@@ -33,19 +33,33 @@ interface SalesComboChartProps {
   data: SalesDataPoint[];
 }
 
-/** 금액 포맷 (만원 단위) */
-const formatRevenue = (value: number) => `₩${(value / 10000).toFixed(0)}만`;
+/** 축 표기용 금액 포맷 (만원 단위 축약) */
+const formatRevenueAxis = (value: number) => `₩${(value / 10000).toFixed(0)}만`;
+
+/** hover/상세 표기용 금액 포맷 (실제값) */
+const formatRevenueDetail = (value: number) => `₩${value.toLocaleString('ko-KR')}`;
 
 /** 전월/전년 대비 변화율 (소수점 1자리) */
-const calcChange = (current: number, prev: number) =>
-  Math.round(((current - prev) / prev) * 1000) / 10;
+export const calcChange = (current: number, prev: number) => {
+  if (prev === 0) {
+    if (current === 0) return 0;
+    return 100;
+  }
+
+  return Math.round(((current - prev) / prev) * 1000) / 10;
+};
+
+const getAchievementRate = (revenue: number, target: number) => {
+  if (target <= 0) return 0;
+  return Math.round((revenue / target) * 100);
+};
 
 // ── 커스텀 툴팁 ─────────────────────────────────────────
 
 const LongTermTooltip = ({ active, payload, label }: ChartTooltipProps<EnrichedSalesPoint>) => {
   if (!active || !payload?.length) return null;
   const point = payload[0].payload;
-  const achievementRate = Math.round((point.revenue / point.target) * 100);
+  const achievementRate = getAchievementRate(point.revenue, point.target);
 
   return (
     <div className="bg-light-surface dark:bg-dark-surface border border-light-border dark:border-dark-border rounded-md shadow-lg p-sm text-bodySm min-w-[208px]">
@@ -53,10 +67,10 @@ const LongTermTooltip = ({ active, payload, label }: ChartTooltipProps<EnrichedS
 
       {/* 매출 + 목표 달성률 */}
       <p className="text-caption font-medium" style={{ color: COLOR_PRIMARY }}>
-        매출: {formatRevenue(point.revenue)}
+        매출: {formatRevenueDetail(point.revenue)}
       </p>
       <p className="text-caption text-light-textSecondary dark:text-dark-textSecondary">
-        목표: {formatRevenue(point.target)}
+        목표: {formatRevenueDetail(point.target)}
         <span
           className={`ml-xs font-semibold ${
             achievementRate >= 100
@@ -142,7 +156,7 @@ export const SalesComboChart = ({ data }: SalesComboChartProps) => {
   const avgAchievementRate = useMemo(
     () =>
       Math.round(
-        chartData.reduce((sum, d) => sum + (d.revenue / d.target) * 100, 0) / chartData.length,
+        chartData.reduce((sum, d) => sum + getAchievementRate(d.revenue, d.target), 0) / chartData.length,
       ),
     [chartData],
   );
@@ -250,7 +264,7 @@ export const SalesComboChart = ({ data }: SalesComboChartProps) => {
             <YAxis
               yAxisId="revenue"
               orientation="left"
-              tickFormatter={formatRevenue}
+              tickFormatter={formatRevenueAxis}
               tick={{ fontSize: 12, fill: COLOR_TEXT_SECONDARY_HEX }}
               axisLine={false}
               tickLine={false}
@@ -327,7 +341,7 @@ export const SalesComboChart = ({ data }: SalesComboChartProps) => {
                 매출
               </p>
               <p className="text-bodySm font-bold text-light-textPrimary dark:text-dark-textPrimary">
-                {formatRevenue(selectedDetail.point.revenue)}
+                {formatRevenueDetail(selectedDetail.point.revenue)}
               </p>
             </div>
 
@@ -336,18 +350,16 @@ export const SalesComboChart = ({ data }: SalesComboChartProps) => {
               <p className="text-caption text-light-textSecondary dark:text-dark-textSecondary mb-xs">
                 목표 달성률
               </p>
-              <p
-                className={`text-bodySm font-bold ${
-                  selectedDetail.point.revenue >= selectedDetail.point.target
-                    ? 'text-light-success dark:text-dark-success'
-                    : 'text-light-warning dark:text-dark-warning'
-                }`}
-              >
-                {Math.round(
-                  (selectedDetail.point.revenue / selectedDetail.point.target) * 100,
-                )}%
-              </p>
-            </div>
+                <p
+                  className={`text-bodySm font-bold ${
+                    selectedDetail.point.revenue >= selectedDetail.point.target
+                      ? 'text-light-success dark:text-dark-success'
+                      : 'text-light-warning dark:text-dark-warning'
+                  }`}
+                >
+                {getAchievementRate(selectedDetail.point.revenue, selectedDetail.point.target)}%
+                </p>
+              </div>
 
             {/* 주문 수 */}
             <div>

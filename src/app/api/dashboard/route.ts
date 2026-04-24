@@ -11,10 +11,11 @@ import type {
   InventoryItem,
   KPICardData,
   RiskLevel,
+  SalesDataPoint,
   TopProductItem,
   TopProductPeriod,
 } from '@/types/dashboard';
-import { MOCK_CATEGORY_DATA, MOCK_SALES_DATA } from '@/constants/mockData';
+import { MOCK_CATEGORY_DATA } from '@/constants/mockData';
 
 const DASHBOARD_LOW_STOCK_LIMIT = 6;
 const DASHBOARD_RECENT_ORDER_LIMIT = 5;
@@ -40,6 +41,12 @@ type RevenueOrderRow = {
 };
 
 type DailySalesOrderRow = {
+  id: string;
+  total_amount: number;
+  created_at: string | null;
+};
+
+type MonthlySalesOrderRow = {
   id: string;
   total_amount: number;
   created_at: string | null;
@@ -121,12 +128,26 @@ function formatMonthDayLabel(date: Date) {
   }).format(date);
 }
 
+function formatMonthLabel(date: Date) {
+  const year = String(date.getFullYear()).slice(2);
+  const month = date.getMonth() + 1;
+  return `'${year}.${month}`;
+}
+
 function getKstDateKey(date: Date) {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
+  }).format(date);
+}
+
+function getKstMonthKey(date: Date) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
   }).format(date);
 }
 
@@ -137,6 +158,17 @@ function getLastNDaysKst(days: number) {
   return Array.from({ length: days }, (_, index) => {
     const date = new Date(todayStart);
     date.setDate(todayStart.getDate() - (days - 1 - index));
+    return date;
+  });
+}
+
+function getLastNMonthsKst(months: number) {
+  const now = new Date();
+  const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  return Array.from({ length: months }, (_, index) => {
+    const date = new Date(currentMonth);
+    date.setMonth(currentMonth.getMonth() - (months - 1 - index));
     return date;
   });
 }
@@ -263,6 +295,28 @@ async function getShortTermOrders(supabaseAdmin: DashboardSupabaseClient) {
   return (data ?? []) as DailySalesOrderRow[];
 }
 
+async function getMonthlySalesOrders(supabaseAdmin: DashboardSupabaseClient) {
+  const monthRange = getLastNMonthsKst(24);
+  const rangeStart = monthRange[0]?.toISOString();
+  const nextMonthStart = new Date(monthRange[monthRange.length - 1] ?? new Date());
+  nextMonthStart.setMonth(nextMonthStart.getMonth() + 1);
+
+  if (!rangeStart) return [];
+
+  const { data, error } = await supabaseAdmin
+    .from('orders')
+    .select('id, total_amount, created_at')
+    .eq('payment_status', 'payment_completed')
+    .eq('shipping_status', 'shipping_completed')
+    .neq('order_status', 'order_cancelled')
+    .gte('created_at', rangeStart)
+    .lt('created_at', nextMonthStart.toISOString());
+
+  if (error) throw error;
+
+  return (data ?? []) as MonthlySalesOrderRow[];
+}
+
 async function getDemandOrders(supabaseAdmin: DashboardSupabaseClient) {
   const demandWindowStart = getAnalysisWindowStart();
 
@@ -361,6 +415,34 @@ async function getShortTermDailyData(supabaseAdmin: DashboardSupabaseClient): Pr
       revenue: current.revenue,
       orders: current.orders,
       stockRiskCount: inventoryStats.lowStockCount,
+    };
+  });
+}
+
+async function getMonthlySalesData(supabaseAdmin: DashboardSupabaseClient): Promise<SalesDataPoint[]> {
+  const monthRange = getLastNMonthsKst(24);
+  const orderRows = await getMonthlySalesOrders(supabaseAdmin);
+  const monthlyMap = new Map<string, { revenue: number; orders: number }>();
+
+  for (const row of orderRows) {
+    if (!row.created_at) continue;
+
+    const key = getKstMonthKey(new Date(row.created_at));
+    const current = monthlyMap.get(key) ?? { revenue: 0, orders: 0 };
+    current.revenue += row.total_amount;
+    current.orders += 1;
+    monthlyMap.set(key, current);
+  }
+
+  return monthRange.map((date) => {
+    const key = getKstMonthKey(date);
+    const current = monthlyMap.get(key) ?? { revenue: 0, orders: 0 };
+
+    return {
+      month: formatMonthLabel(date),
+      revenue: current.revenue,
+      orders: current.orders,
+      target: 0,
     };
   });
 }
@@ -539,13 +621,14 @@ export async function GET(request: Request) {
 
   try {
     const supabaseAdmin = getSupabaseAdmin();
-    const [todayRevenueOrders, todayOrderCount, inventoryStats, orderResult, topProducts, dailyData] = await Promise.all([
+    const [todayRevenueOrders, todayOrderCount, inventoryStats, orderResult, topProducts, dailyData, salesData] = await Promise.all([
       getTodayRevenueOrders(supabaseAdmin),
       getTodayOrderCount(supabaseAdmin),
       getInventoryStats(supabaseAdmin),
       getDashboardOrders(supabaseAdmin, parsedQuery.query),
       getTopProducts(supabaseAdmin),
       getShortTermDailyData(supabaseAdmin),
+      getMonthlySalesData(supabaseAdmin),
     ]);
 
     const todayRevenueTotal = todayRevenueOrders.reduce((sum, order) => sum + order.total_amount, 0);
@@ -580,7 +663,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       kpiData,
       dailyData,
-      salesData: MOCK_SALES_DATA,
+      salesData,
       categoryData: MOCK_CATEGORY_DATA,
       inventoryItems: inventoryStats.inventoryItems,
       orders: orderResult.items,

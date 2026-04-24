@@ -99,6 +99,23 @@ function createShortTermOrdersQueryResult() {
   };
 }
 
+function createMonthlySalesOrdersQueryResult() {
+  return {
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    neq: jest.fn().mockReturnThis(),
+    gte: jest.fn().mockReturnThis(),
+    lt: jest.fn().mockResolvedValue({
+      data: [
+        { id: 'm1', total_amount: 300000, created_at: '2026-04-10T10:00:00.000Z' },
+        { id: 'm2', total_amount: 200000, created_at: '2026-04-20T10:00:00.000Z' },
+        { id: 'm3', total_amount: 150000, created_at: '2026-03-05T10:00:00.000Z' },
+      ],
+      error: null,
+    }),
+  };
+}
+
 function createProductsQueryResult() {
   return {
     select: jest.fn().mockReturnThis(),
@@ -186,24 +203,35 @@ describe('GET /api/dashboard', () => {
     const demandOrdersQuery = createDemandOrdersQueryResult();
     const topProductOrdersQuery = createCompletedOrdersForTopProductsQueryResult();
     const shortTermOrdersQuery = createShortTermOrdersQueryResult();
+    const monthlySalesOrdersQuery = createMonthlySalesOrdersQueryResult();
     const secondDemandOrdersQuery = createDemandOrdersQueryResult();
     const productsQuery = createProductsQueryResult();
     const orderItemsQuery = createOrderItemsQueryResult();
-
-    const ordersQueue = [
-      revenueQuery,
-      countQuery,
-      demandOrdersQuery,
-      topProductOrdersQuery,
-      shortTermOrdersQuery,
-      secondDemandOrdersQuery,
-    ];
 
     const mockSupabaseAdmin = {
       from: jest.fn().mockImplementation((table: string) => {
         if (table === 'products_with_stock') return productsQuery;
         if (table === 'order_items') return orderItemsQuery;
-        if (table === 'orders') return ordersQueue.shift() as never;
+        if (table === 'orders') {
+          const query = {
+            select(selection: string, options?: unknown) {
+              if (options && typeof options === 'object') return countQuery;
+              if (selection === 'id, total_amount') return revenueQuery;
+              if (selection === 'id') {
+                if (!demandOrdersQuery.gte.mock.calls.length) return demandOrdersQuery;
+                return secondDemandOrdersQuery;
+              }
+              if (selection === 'id, created_at') return topProductOrdersQuery;
+              if (selection === 'id, total_amount, created_at') {
+                if (!shortTermOrdersQuery.gte.mock.calls.length) return shortTermOrdersQuery;
+                return monthlySalesOrdersQuery;
+              }
+              return undefined;
+            },
+          };
+
+          return query;
+        }
         return undefined;
       }),
     };
@@ -238,6 +266,7 @@ describe('GET /api/dashboard', () => {
     const body = response.body as {
       kpiData: Array<{ id: string; value: string | number }>;
       dailyData: Array<{ date: string; revenue: number; orders: number; stockRiskCount: number }>;
+      salesData: Array<{ month: string; revenue: number; orders: number; target: number }>;
       inventoryItems: Array<{ sku: string; currentStock: number }>;
       orders: Array<{ orderNumber: string }>;
       ordersPagination: { total: number; page: number; limit: number };
@@ -265,6 +294,10 @@ describe('GET /api/dashboard', () => {
     expect(shortTermOrdersQuery.eq).toHaveBeenCalledWith('shipping_status', 'shipping_completed');
     expect(shortTermOrdersQuery.neq).toHaveBeenCalledWith('order_status', 'order_cancelled');
 
+    expect(monthlySalesOrdersQuery.eq).toHaveBeenCalledWith('payment_status', 'payment_completed');
+    expect(monthlySalesOrdersQuery.eq).toHaveBeenCalledWith('shipping_status', 'shipping_completed');
+    expect(monthlySalesOrdersQuery.neq).toHaveBeenCalledWith('order_status', 'order_cancelled');
+
     expect(orderItemsQuery.in).toHaveBeenCalledWith('order_id', ['o1', 'o2']);
 
     expect(mockGetOrders).toHaveBeenCalledWith(
@@ -289,6 +322,13 @@ describe('GET /api/dashboard', () => {
       expect.arrayContaining([
         expect.objectContaining({ revenue: 100000, orders: 1, stockRiskCount: 2 }),
         expect.objectContaining({ revenue: 250000, orders: 1, stockRiskCount: 2 }),
+      ]),
+    );
+
+    expect(body.salesData).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ revenue: 500000, orders: 2, target: 0 }),
+        expect.objectContaining({ revenue: 150000, orders: 1, target: 0 }),
       ]),
     );
 
