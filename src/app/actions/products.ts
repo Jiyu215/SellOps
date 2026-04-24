@@ -22,7 +22,7 @@ export async function saveProductAction(
 ): Promise<{ id: string; product?: ProductDetail }> {
   const supabaseAdmin = getSupabaseAdmin()
   const now = new Date().toISOString();
-  const categoryId = data.categoryId.trim() || null;
+  const categoryId = data.categoryId?.trim() || null;
 
   const { data: category } = categoryId
     ? await supabaseAdmin
