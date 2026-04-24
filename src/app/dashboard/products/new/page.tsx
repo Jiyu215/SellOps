@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { MOCK_NOTIFICATIONS } from '@/constants/mockData';
 import { ProductDetailForm } from '@/components/dashboard/products/ProductDetailForm';
+import { getProductCategoryOptions } from '@/dal/categories';
 import { getDashboardUser } from '@/lib/dashboard/currentUser';
 import { ProductDetailSkeleton } from '../[id]/ProductDetailSkeleton';
 
@@ -17,6 +18,7 @@ export const metadata = {
  */
 export default async function ProductNewPage() {
   const currentUser = await getDashboardUser();
+  const categoryOptions = await getProductCategoryOptions();
 
   return (
     <DashboardLayout
@@ -26,7 +28,7 @@ export default async function ProductNewPage() {
       nativeScroll
     >
       <Suspense fallback={<ProductDetailSkeleton />}>
-        <ProductDetailForm isNew={true} />
+        <ProductDetailForm isNew={true} categoryOptions={categoryOptions} />
       </Suspense>
     </DashboardLayout>
   );

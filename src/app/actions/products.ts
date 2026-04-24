@@ -22,6 +22,15 @@ export async function saveProductAction(
 ): Promise<{ id: string; product?: ProductDetail }> {
   const supabaseAdmin = getSupabaseAdmin()
   const now = new Date().toISOString();
+  const categoryId = data.categoryId.trim() || null;
+
+  const { data: category } = categoryId
+    ? await supabaseAdmin
+        .from('categories')
+        .select('id, name')
+        .eq('id', categoryId)
+        .maybeSingle()
+    : { data: null };
 
   if (id) {
     // ── 수정 ──────────────────────────────────────────────────────────────────
@@ -31,6 +40,7 @@ export async function saveProductAction(
         name:              data.name,
         ...(typeof data.price === 'number' && { price: data.price }),
         product_code:      data.productCode,
+        category_id:       categoryId,
         summary:           data.summary,
         short_description: data.shortDescription,
         description:       data.description,
@@ -53,6 +63,7 @@ export async function saveProductAction(
       name:              data.name,
       price:             typeof data.price === 'number' ? data.price : 0,
       product_code:      data.productCode,
+      category_id:       categoryId,
       summary:           data.summary,
       short_description: data.shortDescription,
       description:       data.description,
@@ -86,7 +97,8 @@ export async function saveProductAction(
     id:               newRow.id,
     productCode:      newRow.product_code,
     name:             newRow.name,
-    category:         '',
+    categoryId:       newRow.category_id ?? categoryId,
+    category:         category?.name ?? '',
     price:            newRow.price,
     summary:          newRow.summary,
     shortDescription: newRow.short_description ?? '',

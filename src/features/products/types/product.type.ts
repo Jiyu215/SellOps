@@ -84,6 +84,8 @@ export type ProductDetail = {
   name: string
   price: number
   product_code: string
+  category_id: string | null
+  category_name: string
   summary: string
   short_description: string | null
   description: string
@@ -99,6 +101,7 @@ export type ProductCreateBody = {
   name: string
   price: number
   product_code: string
+  category_id?: string | null
   summary: string
   short_description?: string
   description: string

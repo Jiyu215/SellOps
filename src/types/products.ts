@@ -112,11 +112,17 @@ export interface StockHistory {
   createdAt: string;   // ISO 8601
 }
 
+export interface ProductCategoryOption {
+  id:   string;
+  name: string;
+}
+
 // ── 상품 상세 ─────────────────────────────────────────────
 export interface ProductDetail {
   id:               string;
   productCode:      string;
   name:             string;
+  categoryId:       string | null;
   category:         string;
   price:            number;
   summary:          string;            // 요약 설명 (최대 200자)
@@ -134,6 +140,7 @@ export interface ProductDetail {
 export interface ProductFormData {
   name:             string;
   productCode:      string;
+  categoryId:       string;
   price:            number | '';
   summary:          string;
   shortDescription: string;
@@ -143,6 +150,7 @@ export interface ProductFormData {
 
 // ── 폼 에러 ───────────────────────────────────────────────
 export interface ProductFormErrors {
+  categoryId?:   string;
   name?:        string;
   productCode?: string;
   price?:       string;

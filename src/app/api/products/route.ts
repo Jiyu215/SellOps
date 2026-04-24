@@ -123,6 +123,7 @@ export async function POST(request: Request) {
         name:              body.name,
         price:             body.price,
         product_code:      body.product_code,
+        category_id:       body.category_id ?? null,
         summary:           body.summary,
         short_description: body.short_description ?? null,
         description:       body.description,

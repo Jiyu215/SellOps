@@ -17,6 +17,14 @@ export async function getProductById(id: string): Promise<ProductDetail | null> 
 
   if (error || !product) return null;
 
+  const { data: category } = product.category_id
+    ? await supabaseAdmin
+        .from('categories')
+        .select('id, name')
+        .eq('id', product.category_id)
+        .maybeSingle()
+    : { data: null };
+
   const [{ data: stock }, { data: images }] = await Promise.all([
     supabaseAdmin
       .from('stocks')
@@ -48,7 +56,8 @@ export async function getProductById(id: string): Promise<ProductDetail | null> 
     id:               product.id,
     productCode:      product.product_code,
     name:             product.name,
-    category:         '',
+    categoryId:       product.category_id ?? null,
+    category:         category?.name ?? '',
     price:            product.price,
     summary:          product.summary,
     shortDescription: product.short_description ?? '',

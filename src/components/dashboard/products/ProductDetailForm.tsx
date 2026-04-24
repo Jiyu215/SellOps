@@ -38,6 +38,7 @@ import type {
   ProductImage,
   ProductStatus,
   StockHistory,
+  ProductCategoryOption,
   ProductFormData,
   ProductFormErrors,
   CodeCheckState,
@@ -126,6 +127,7 @@ function getDraftKey(productId: string | null): string {
 export interface ProductDetailFormProps {
   product?: ProductDetail;
   isNew:    boolean;
+  categoryOptions?: ProductCategoryOption[];
 }
 
 // ── 폼 초기값 ─────────────────────────────────────────────────────────────────
@@ -135,6 +137,7 @@ function getInitialFormData(product?: ProductDetail): ProductFormData {
     return {
       name:             '',
       productCode:      '',
+      categoryId:       '',
       price:            '',
       summary:          '',
       shortDescription: '',
@@ -145,6 +148,7 @@ function getInitialFormData(product?: ProductDetail): ProductFormData {
   return {
     name:             product.name,
     productCode:      product.productCode,
+    categoryId:       product.categoryId ?? '',
     price:            product.price,
     summary:          product.summary,
     shortDescription: product.shortDescription,
@@ -486,7 +490,11 @@ interface ToastState {
 
 // ── 메인 컴포넌트 ─────────────────────────────────────────────────────────────
 
-export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) => {
+export const ProductDetailForm = ({
+  product,
+  isNew,
+  categoryOptions = [],
+}: ProductDetailFormProps) => {
   const router    = useRouter();
   const uid       = useId();
   const fid       = (field: string) => `${uid}-${field}`;
@@ -574,6 +582,7 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
   const currentIsNew   = savedNewProduct === null && isNew;
 
   // ── 필드 ref (첫 에러 포커스용) ───────────────────────────
+  const categoryRef    = useRef<HTMLSelectElement>(null);
   const nameRef        = useRef<HTMLInputElement>(null);
   const codeRef        = useRef<HTMLInputElement>(null);
   const priceRef       = useRef<HTMLInputElement>(null);
@@ -591,6 +600,7 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
     const formChanged =
       formData.name             !== initial.name             ||
       formData.productCode      !== initial.productCode      ||
+      formData.categoryId       !== initial.categoryId       ||
       formData.price            !== initial.price            ||
       formData.summary          !== initial.summary          ||
       formData.shortDescription !== initial.shortDescription ||
@@ -709,6 +719,9 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
   // ── 유효성 검사 ──────────────────────────────────────────
   const validate = useCallback((): boolean => {
     const next: ProductFormErrors = {};
+    if (categoryOptions.length > 0 && !formData.categoryId) {
+      next.categoryId = '카테고리를 선택해주세요.';
+    }
 
     if (!formData.name.trim()) {
       next.name = '상품명을 입력해주세요.';
@@ -730,10 +743,11 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
 
     setErrors(next);
     return Object.keys(next).length === 0;
-  }, [formData, codeCheck, codeCheckedFor]);
+  }, [categoryOptions.length, formData, codeCheck, codeCheckedFor]);
 
   // ── 첫 에러 필드 포커스 ───────────────────────────────────
   const focusFirstError = useCallback((errs: ProductFormErrors) => {
+    if (errs.categoryId)  { categoryRef.current?.focus(); categoryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
     if (errs.name)        { nameRef.current?.focus(); nameRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
     if (errs.productCode) { codeRef.current?.focus(); codeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
     if (errs.price)       { priceRef.current?.focus(); priceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
@@ -742,6 +756,10 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
   // ── blur 단일 유효성 ─────────────────────────────────────
   const handleBlur = useCallback((field: keyof ProductFormErrors) => {
     const next: ProductFormErrors = { ...errors };
+    if (field === 'categoryId') {
+      if (categoryOptions.length > 0 && !formData.categoryId) next.categoryId = '카테고리를 선택해주세요.';
+      else delete next.categoryId;
+    }
 
     if (field === 'name') {
       if (!formData.name.trim()) next.name = '상품명을 입력해주세요.';
@@ -760,7 +778,7 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
     }
 
     setErrors(next);
-  }, [errors, formData]);
+  }, [categoryOptions.length, errors, formData]);
 
   // ── 상품코드 중복 확인 ────────────────────────────────────
   const handleCodeCheck = useCallback(async () => {
@@ -797,6 +815,7 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
     const valid = validate();
     if (!valid) {
       const errs = {} as ProductFormErrors;
+      if (categoryOptions.length > 0 && !formData.categoryId) errs.categoryId = '카테고리를 선택해주세요.';
       if (!formData.name.trim()) errs.name = '상품명을 입력해주세요.';
       if (formData.price === '' || formData.price < 0) errs.price = '올바른 금액을 입력해주세요.';
       if (!formData.productCode.trim()) errs.productCode = '상품코드를 입력해주세요.';
@@ -944,7 +963,7 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
     } finally {
       setIsSaving(false);
     }
-  }, [validate, formData, currentIsNew, focusFirstError, currentProduct, stock, showToast, setSavedNewProduct, pendingStockAdjustments, historyOpen]);
+  }, [validate, categoryOptions.length, formData, currentIsNew, focusFirstError, currentProduct, stock, showToast, setSavedNewProduct, pendingStockAdjustments, historyOpen]);
 
   // ── 상품 삭제 ────────────────────────────────────────────
   const handleDelete = useCallback(async () => {
@@ -1382,6 +1401,32 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
             </FieldGroup>
 
             {/* 상품코드 + 판매가 */}
+            <FieldGroup
+              id={fid('categoryId')}
+              label="카테고리"
+              required
+              error={errors.categoryId}
+            >
+              <select
+                ref={categoryRef}
+                id={fid('categoryId')}
+                value={formData.categoryId}
+                aria-required="true"
+                aria-invalid={!!errors.categoryId}
+                aria-describedby={errors.categoryId ? `${fid('categoryId')}-error` : undefined}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setField('categoryId', e.target.value)}
+                onBlur={() => handleBlur('categoryId')}
+                className={inputCls(!!errors.categoryId)}
+              >
+                <option value="">카테고리를 선택해주세요.</option>
+                {categoryOptions.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </FieldGroup>
+
             <div className="flex flex-col sm:flex-row gap-md">
               {/* 상품코드 */}
               <FieldGroup

@@ -29,6 +29,14 @@ export async function GET(
       )
     }
 
+    const { data: category } = product.category_id
+      ? await supabaseAdmin
+          .from('categories')
+          .select('id, name')
+          .eq('id', product.category_id)
+          .maybeSingle()
+      : { data: null }
+
     // 재고 조회
     const { data: stock } = await supabaseAdmin
       .from('stocks')
@@ -45,6 +53,8 @@ export async function GET(
 
     return NextResponse.json({
       ...product,
+      category_id: product.category_id ?? null,
+      category_name: category?.name ?? '',
       stock: stock
         ? { ...stock, available: stock.total - stock.sold }
         : { product_id: id, total: 0, sold: 0, available: 0 },

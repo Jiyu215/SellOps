@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 export const productStatusSchema = z.enum(['active', 'hidden', 'sold_out'])
+const categoryIdSchema = z.uuid().nullable()
 
 /**
  * PATCH /api/products/[id] 요청 바디 스키마.
@@ -15,6 +16,7 @@ export const productUpdateSchema = z
     product_code:      z.string().min(1).max(50).regex(/^[A-Za-z0-9-]+$/, {
                          message: '상품코드는 영문, 숫자, 하이픈만 허용됩니다.',
                        }),
+    category_id:       categoryIdSchema,
     summary:           z.string().max(200),
     short_description: z.string().max(500),
     description:       z.string(),

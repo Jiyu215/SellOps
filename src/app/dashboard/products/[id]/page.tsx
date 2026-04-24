@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { MOCK_NOTIFICATIONS } from '@/constants/mockData';
+import { getProductCategoryOptions } from '@/dal/categories';
 import { getProductById } from '@/dal/products';
 import { getDashboardUser } from '@/lib/dashboard/currentUser';
 import { ProductDetailContent } from './ProductDetailContent';
@@ -29,6 +30,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   const { id }  = await params;
   const product = await getProductById(id);
   const currentUser = await getDashboardUser();
+  const categoryOptions = await getProductCategoryOptions();
 
   if (!product) notFound();
 
@@ -40,7 +42,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       nativeScroll
     >
       <Suspense fallback={<ProductDetailSkeleton />}>
-        <ProductDetailContent product={product} />
+        <ProductDetailContent product={product} categoryOptions={categoryOptions} />
       </Suspense>
     </DashboardLayout>
   );
