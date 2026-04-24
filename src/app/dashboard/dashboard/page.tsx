@@ -1,15 +1,16 @@
+import { Suspense } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { DashboardContent } from '@/components/dashboard/DashboardContent';
+import { DashboardSkeleton } from '@/components/dashboard/skeletons';
 import { MOCK_NOTIFICATIONS } from '@/constants/mockData';
 import { getDashboardUser } from '@/lib/dashboard/currentUser';
 
 /**
  * 대시보드 메인 페이지 (Server Component)
  *
- * - 레이아웃(사이드바·헤더)만 서버에서 렌더링
+ * - 레이아웃은 서버에서 렌더링
  * - 실제 콘텐츠는 DashboardContent(Client)가 비동기로 로드
- *   → 데이터 준비 전: DashboardSkeleton 표시
- *   → 데이터 준비 후: 차트·테이블·카드 렌더링
+ * - useSearchParams 기반 주문 필터를 위해 Suspense로 감싼다
  */
 export default async function DashboardPage() {
   const currentUser = await getDashboardUser();
@@ -20,7 +21,9 @@ export default async function DashboardPage() {
       pageTitle="대시보드"
       notifications={MOCK_NOTIFICATIONS}
     >
-      <DashboardContent />
+      <Suspense fallback={<DashboardSkeleton />}>
+        <DashboardContent />
+      </Suspense>
     </DashboardLayout>
   );
 }

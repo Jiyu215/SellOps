@@ -25,7 +25,7 @@ export type PaymentMethod = 'card' | 'bank_transfer' | 'kakao_pay' | 'naver_pay'
 
 export type OrderStockStatus = 'none' | 'applied' | 'released'
 
-export type OrderPageLimit = 10 | 20 | 50 | 100
+export type OrderPageLimit = 5 | 10 | 20 | 50 | 100
 
 export interface OrderCustomer {
   name: string

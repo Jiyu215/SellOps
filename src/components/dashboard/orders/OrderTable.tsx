@@ -212,7 +212,7 @@ export const OrderTable = ({
   } = useOrderFilter();
 
   const isOrdersVariant = variant === 'orders';
-  const hasServerPagination = isOrdersVariant && Boolean(pagination);
+  const hasServerPagination = Boolean(pagination);
   const TABLE_COLS = isOrdersVariant ? ORDERS_TABLE_COLS : DASHBOARD_TABLE_COLS;
 
   // ── 반응형 페이지 크기 ────────────────────────────────────────────────────
@@ -237,6 +237,7 @@ export const OrderTable = ({
   );
 
   const filteredOrders = useMemo(() => {
+    if (hasServerPagination) return orders;
     if (isOrdersVariant) return orders;
 
     const q = filter.search.trim().toLowerCase();
@@ -253,7 +254,7 @@ export const OrderTable = ({
 
       return matchesSearch && matchesOrderStatus && matchesPaymentStatus && matchesShipping;
     });
-  }, [isOrdersVariant, orders, sortedOrders, filter]);
+  }, [hasServerPagination, isOrdersVariant, orders, sortedOrders, filter]);
 
   // ── 페이지네이션 ──────────────────────────────────────────────────────────
   const totalRecords = pagination?.total ?? filteredOrders.length;

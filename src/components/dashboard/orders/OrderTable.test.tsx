@@ -20,6 +20,33 @@ beforeEach(() => {
   });
 });
 
+describe('dashboard variant server pagination', () => {
+  test('uses server total/page and delegates page changes', () => {
+    const handlePageChange = jest.fn();
+
+    render(
+      <OrderTable
+        orders={MOCK_ORDERS}
+        pagination={{
+          total: 12,
+          page:  2,
+          limit: 5,
+          onPageChange: handlePageChange,
+        }}
+      />
+    );
+
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getByText('2 / 3')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('PREVIOUS'));
+    expect(handlePageChange).toHaveBeenCalledWith(1);
+
+    fireEvent.click(screen.getByText('NEXT PAGE'));
+    expect(handlePageChange).toHaveBeenCalledWith(3);
+  });
+});
+
 describe('orders variant server pagination', () => {
   test('uses server total/page and delegates page changes', () => {
     const handlePageChange = jest.fn();

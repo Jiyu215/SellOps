@@ -120,7 +120,14 @@ export interface DashboardPageProps {
   categoryData: CategoryDataPoint[];
   inventoryItems: InventoryItem[];
   orders: Order[];
+  ordersPagination: DashboardOrdersPagination;
   currentUser: UserProfile;
+}
+
+export interface DashboardOrdersPagination {
+  total: number;
+  page: number;
+  limit: number;
 }
 
 // ── 대시보드 데이터 묶음 (서비스 레이어 반환 타입) ──────────
@@ -131,5 +138,6 @@ export interface DashboardData {
   categoryData: CategoryDataPoint[];
   inventoryItems: InventoryItem[];
   orders: Order[];
+  ordersPagination: DashboardOrdersPagination;
   topProducts: Record<TopProductPeriod, TopProductItem[]>;
 }
