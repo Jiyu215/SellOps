@@ -83,6 +83,22 @@ function createTodayOrderCountQueryResult() {
   };
 }
 
+function createShortTermOrdersQueryResult() {
+  return {
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    neq: jest.fn().mockReturnThis(),
+    gte: jest.fn().mockReturnThis(),
+    lt: jest.fn().mockResolvedValue({
+      data: [
+        { id: 'o1', total_amount: 100000, created_at: '2026-04-23T10:00:00.000Z' },
+        { id: 'o2', total_amount: 250000, created_at: '2026-04-24T10:00:00.000Z' },
+      ],
+      error: null,
+    }),
+  };
+}
+
 function createProductsQueryResult() {
   return {
     select: jest.fn().mockReturnThis(),
@@ -102,10 +118,7 @@ function createDemandOrdersQueryResult() {
     eq: jest.fn().mockReturnThis(),
     neq: jest.fn().mockReturnThis(),
     gte: jest.fn().mockResolvedValue({
-      data: [
-        { id: 'o1' },
-        { id: 'o2' },
-      ],
+      data: [{ id: 'o1' }, { id: 'o2' }],
       error: null,
     }),
   };
@@ -167,14 +180,24 @@ describe('GET /api/dashboard', () => {
     expect(mockGetSupabaseAdmin).not.toHaveBeenCalled();
   });
 
-  test('인증되면 KPI, 재고부족, 최근주문과 주문 페이지네이션을 반환한다', async () => {
+  test('인증되면 주간 매출/주문, 인기상품, 재고부족, 최근주문을 실제 데이터 형태로 반환한다', async () => {
     const revenueQuery = createRevenueOrdersQueryResult();
     const countQuery = createTodayOrderCountQueryResult();
-    const productsQuery = createProductsQueryResult();
     const demandOrdersQuery = createDemandOrdersQueryResult();
     const topProductOrdersQuery = createCompletedOrdersForTopProductsQueryResult();
+    const shortTermOrdersQuery = createShortTermOrdersQueryResult();
+    const secondDemandOrdersQuery = createDemandOrdersQueryResult();
+    const productsQuery = createProductsQueryResult();
     const orderItemsQuery = createOrderItemsQueryResult();
-    const ordersQueue = [revenueQuery, countQuery, demandOrdersQuery, topProductOrdersQuery];
+
+    const ordersQueue = [
+      revenueQuery,
+      countQuery,
+      demandOrdersQuery,
+      topProductOrdersQuery,
+      shortTermOrdersQuery,
+      secondDemandOrdersQuery,
+    ];
 
     const mockSupabaseAdmin = {
       from: jest.fn().mockImplementation((table: string) => {
@@ -214,6 +237,7 @@ describe('GET /api/dashboard', () => {
     const response = await GET(request) as MockRouteResponse;
     const body = response.body as {
       kpiData: Array<{ id: string; value: string | number }>;
+      dailyData: Array<{ date: string; revenue: number; orders: number; stockRiskCount: number }>;
       inventoryItems: Array<{ sku: string; currentStock: number }>;
       orders: Array<{ orderNumber: string }>;
       ordersPagination: { total: number; page: number; limit: number };
@@ -226,14 +250,23 @@ describe('GET /api/dashboard', () => {
 
     expect(response.status).toBe(200);
     expect(mockGetSupabaseAdmin).toHaveBeenCalledTimes(1);
+
     expect(revenueQuery.eq).toHaveBeenCalledWith('order_status', 'order_completed');
     expect(revenueQuery.eq).toHaveBeenCalledWith('payment_status', 'payment_completed');
     expect(revenueQuery.neq).toHaveBeenCalledWith('shipping_status', 'return_completed');
+
     expect(demandOrdersQuery.eq).toHaveBeenCalledWith('order_status', 'order_completed');
+
     expect(topProductOrdersQuery.eq).toHaveBeenCalledWith('payment_status', 'payment_completed');
     expect(topProductOrdersQuery.eq).toHaveBeenCalledWith('shipping_status', 'shipping_completed');
     expect(topProductOrdersQuery.neq).toHaveBeenCalledWith('order_status', 'order_cancelled');
+
+    expect(shortTermOrdersQuery.eq).toHaveBeenCalledWith('payment_status', 'payment_completed');
+    expect(shortTermOrdersQuery.eq).toHaveBeenCalledWith('shipping_status', 'shipping_completed');
+    expect(shortTermOrdersQuery.neq).toHaveBeenCalledWith('order_status', 'order_cancelled');
+
     expect(orderItemsQuery.in).toHaveBeenCalledWith('order_id', ['o1', 'o2']);
+
     expect(mockGetOrders).toHaveBeenCalledWith(
       mockSupabaseAdmin,
       expect.objectContaining({
@@ -243,6 +276,7 @@ describe('GET /api/dashboard', () => {
         limit: 5,
       }),
     );
+
     expect(body.kpiData).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: 'kpi-revenue', value: '350,000' }),
@@ -250,20 +284,29 @@ describe('GET /api/dashboard', () => {
         expect.objectContaining({ id: 'kpi-stock-critical', value: 2 }),
       ]),
     );
+
+    expect(body.dailyData).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ revenue: 100000, orders: 1, stockRiskCount: 2 }),
+        expect.objectContaining({ revenue: 250000, orders: 1, stockRiskCount: 2 }),
+      ]),
+    );
+
     expect(body.inventoryItems).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ sku: 'PRD-001', currentStock: 3 }),
         expect.objectContaining({ sku: 'PRD-002', currentStock: 12 }),
       ]),
     );
-    expect(body.orders).toEqual([
-      expect.objectContaining({ orderNumber: 'SO-2026-0001' }),
-    ]);
+
+    expect(body.orders).toEqual([expect.objectContaining({ orderNumber: 'SO-2026-0001' })]);
+
     expect(body.ordersPagination).toEqual({
       total: 12,
       page: 2,
       limit: 5,
     });
+
     expect(body.topProducts.today).toEqual([
       expect.objectContaining({ sku: 'PRD-001', revenue: 90000 }),
     ]);
