@@ -646,7 +646,7 @@ describe('재고 관리', () => {
     const histBtn = screen.getByRole('button', { name: /재고 이력 보기/ });
     fireEvent.click(histBtn);
     await waitFor(() => {
-      expect(screen.getByText('초기 입고')).toBeInTheDocument();
+      expect(screen.getByText('KB-MXS-BLK')).toBeInTheDocument();
     });
   });
 
@@ -655,11 +655,11 @@ describe('재고 관리', () => {
     const histBtn = screen.getByRole('button', { name: /재고 이력 보기/ });
     fireEvent.click(histBtn);
     await waitFor(() => {
-      expect(screen.getByText('초기 입고')).toBeInTheDocument();
+      expect(screen.getByText('KB-MXS-BLK')).toBeInTheDocument();
     });
     fireEvent.click(histBtn);
     await waitFor(() => {
-      expect(screen.queryByText('초기 입고')).not.toBeInTheDocument();
+      expect(screen.queryByText('KB-MXS-BLK')).not.toBeInTheDocument();
     });
   });
 });

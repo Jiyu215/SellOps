@@ -432,6 +432,18 @@ export type Database = {
         }
         Returns: Database["public"]["Tables"]["orders"]["Row"]
       }
+      update_order_status_with_stock: {
+        Args: {
+          p_order_id: string
+          p_order_status?: string | null
+          p_payment_status?: string | null
+          p_shipping_status?: string | null
+          p_actor_type?: string | null
+          p_actor_name?: string | null
+          p_reason?: string | null
+        }
+        Returns: Database["public"]["Tables"]["orders"]["Row"]
+      }
     }
     Enums: {
       [_ in never]: never

@@ -1799,7 +1799,7 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
                 </button>
 
                 {historyOpen && (
-                  <div className="mt-sm overflow-x-auto">
+                  <div className="mt-sm max-h-[320px] overflow-x-auto overflow-y-auto sm:max-h-[360px] lg:max-h-[420px]">
                     <table className="w-full text-caption" aria-label="재고 이력">
                       <thead>
                         <tr className="text-light-textSecondary dark:text-dark-textSecondary border-b border-light-border dark:border-dark-border">
@@ -1822,7 +1822,7 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
                             <td className={`py-xs text-right font-medium whitespace-nowrap ${h.type === 'in' ? 'text-light-success dark:text-dark-success' : 'text-light-error dark:text-dark-error'}`}>
                               {h.type === 'in' ? '+' : '-'}{h.quantity}
                             </td>
-                            <td className="py-xs text-light-textSecondary dark:text-dark-textSecondary">{h.reason ?? '-'}</td>
+                            <td className="py-xs text-light-textSecondary dark:text-dark-textSecondary">{currentProduct?.productCode ?? '-'}</td>
                             <td className="py-xs text-light-textSecondary dark:text-dark-textSecondary whitespace-nowrap">{h.operator}</td>
                           </tr>
                         ))}

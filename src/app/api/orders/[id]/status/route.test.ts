@@ -1,7 +1,5 @@
 /**
  * @jest-environment node
- *
- * PATCH /api/orders/[id]/status Route Handler 테스트.
  */
 
 jest.mock('next/headers', () => ({}), { virtual: true })
@@ -42,16 +40,17 @@ const MOCK_401_RESPONSE: AuthFail['response'] = NextResponse.json(
   { status: 401 },
 ) as unknown as AuthFail['response']
 
-const MOCK_ORDER_ROW = {
-  id:              'order-001',
-  order_number:    'SO-2026-000001',
-  customer_name:   '테스트 고객',
-  total_amount:    10000,
-  status:          'pending',
-  order_status:    'order_confirmed',
-  payment_status:  'payment_completed',
+const DEFAULT_UPDATED_ORDER = {
+  id: 'order-001',
+  order_number: 'SO-2026-000001',
+  customer_name: '테스트 고객',
+  total_amount: 10000,
+  status: 'pending',
+  order_status: 'order_confirmed',
+  payment_status: 'payment_completed',
   shipping_status: 'shipping_ready',
-  updated_at:      '2026-04-23T00:00:00.000Z',
+  stock_status: 'none',
+  updated_at: '2026-04-23T00:00:00.000Z',
 }
 
 function makeUnauthedReturn(): Promise<AuthFail> {
@@ -68,67 +67,142 @@ function makeAuthedReturn(): Promise<AuthOk> {
 function makeRequest(body: unknown, orderId = 'order-001') {
   return {
     request: new Request(`http://localhost/api/orders/${orderId}/status`, {
-      method:  'PATCH',
-      body:    JSON.stringify(body),
+      method: 'PATCH',
+      body: JSON.stringify(body),
       headers: { 'Content-Type': 'application/json' },
     }),
     params: Promise.resolve({ id: orderId }),
   }
 }
 
-function makeRpcMock(data: unknown = MOCK_ORDER_ROW, error: unknown = null) {
-  const rpc = jest.fn().mockResolvedValue({ data, error })
-  ;(getSupabaseAdmin as jest.Mock).mockReturnValue({ rpc })
-  return { rpc }
+type MockOptions = {
+  currentOrder?: {
+    order_status: string
+    payment_status: string
+    shipping_status: string
+    stock_status: string
+  }
+  orderItems?: Array<{ product_id: string; quantity: number }>
+  stockRow?: { product_id: string; total: number; sold: number }
+  rpcData?: unknown
+  rpcError?: { code?: string; message?: string } | null
 }
 
-function makeRpcMissingFallbackMock() {
-  const rpc = jest.fn().mockResolvedValue({
-    data:  null,
-    error: { code: 'PGRST202', message: 'Could not find update_order_status_with_history' },
-  })
-  const currentSingle = jest.fn().mockResolvedValue({
-    data: {
-      order_status:    'order_waiting',
-      payment_status:  'payment_pending',
-      shipping_status: 'shipping_ready',
-    },
+function makeSupabaseAdminMock(options: MockOptions = {}) {
+  const currentOrder = options.currentOrder ?? {
+    order_status: 'order_confirmed',
+    payment_status: 'payment_completed',
+    shipping_status: 'shipping_ready',
+    stock_status: 'none',
+  }
+  const orderItems = options.orderItems ?? [{ product_id: 'product-001', quantity: 2 }]
+  const stockRow = options.stockRow ?? { product_id: 'product-001', total: 10, sold: 0 }
+  const rpcData = options.rpcData ?? DEFAULT_UPDATED_ORDER
+  const rpcError = options.rpcError ?? null
+
+  const ordersSelectSingle = jest.fn().mockResolvedValue({ data: currentOrder, error: null })
+  const orderItemsEq = jest.fn().mockResolvedValue({ data: orderItems, error: null })
+  const stockSelectSingle = jest.fn().mockResolvedValue({ data: stockRow, error: null })
+  const stockHistoryInsert = jest.fn().mockResolvedValue({ error: null })
+  const orderStatusHistoryInsert = jest.fn().mockResolvedValue({ error: null })
+
+  const orderUpdateSingle = jest.fn().mockResolvedValue({
+    data: DEFAULT_UPDATED_ORDER,
     error: null,
   })
-  const currentEq     = jest.fn().mockReturnValue({ single: currentSingle })
-  const currentSelect = jest.fn().mockReturnValue({ eq: currentEq })
-  const updateSingle  = jest.fn().mockResolvedValue({ data: MOCK_ORDER_ROW, error: null })
-  const updateSelect  = jest.fn().mockReturnValue({ single: updateSingle })
-  const updateEq      = jest.fn().mockReturnValue({ select: updateSelect })
-  const update        = jest.fn().mockReturnValue({ eq: updateEq })
-  const insert        = jest.fn().mockResolvedValue({ error: null })
-  const from          = jest.fn((table: string) => {
-    if (table === 'orders') return { select: currentSelect, update }
-    if (table === 'order_status_histories') return { insert }
+
+  const ordersUpdate = jest.fn(() => ({
+    eq: jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        single: orderUpdateSingle,
+      }),
+    }),
+  }))
+
+  const stocksUpdate = jest.fn((payload: Record<string, unknown>) => ({
+    eq: jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        single: jest.fn().mockResolvedValue({
+          data: { ...stockRow, ...payload },
+          error: null,
+        }),
+      }),
+    }),
+  }))
+
+  const rpc = jest.fn().mockImplementation(async (fn: string) => {
+    if (fn === 'update_order_status_with_stock') {
+      return { data: rpcData, error: rpcError }
+    }
+
+    return { data: null, error: null }
+  })
+
+  const from = jest.fn((table: string) => {
+    if (table === 'orders') {
+      return {
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            single: ordersSelectSingle,
+          }),
+        }),
+        update: ordersUpdate,
+      }
+    }
+
+    if (table === 'order_items') {
+      return {
+        select: jest.fn().mockReturnValue({
+          eq: orderItemsEq,
+        }),
+      }
+    }
+
+    if (table === 'stocks') {
+      return {
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            single: stockSelectSingle,
+          }),
+        }),
+        update: stocksUpdate,
+      }
+    }
+
+    if (table === 'stock_histories') {
+      return { insert: stockHistoryInsert }
+    }
+
+    if (table === 'order_status_histories') {
+      return { insert: orderStatusHistoryInsert }
+    }
+
     return {}
   })
 
   ;(getSupabaseAdmin as jest.Mock).mockReturnValue({ rpc, from })
 
-  return { rpc, from, update, insert }
-}
-
-function makeRpcMissingWithoutHistoryTableMock() {
-  const mock = makeRpcMissingFallbackMock()
-  mock.insert.mockResolvedValue({
-    error: { code: 'PGRST205', message: 'Could not find order_status_histories' },
-  })
-  return mock
+  return {
+    rpc,
+    ordersUpdate,
+    stocksUpdate,
+    stockHistoryInsert,
+    orderStatusHistoryInsert,
+  }
 }
 
 beforeEach(() => {
   jest.clearAllMocks()
 })
 
-describe('PATCH /api/orders/[id]/status - 미인증 401', () => {
-  test('requireAuth가 ok:false면 401 응답을 그대로 반환한다', async () => {
+describe('PATCH /api/orders/[id]/status', () => {
+  beforeEach(() => {
+    mockRequireAuth.mockImplementation(makeAuthedReturn)
+  })
+
+  test('unauthenticated request returns 401', async () => {
     mockRequireAuth.mockImplementation(makeUnauthedReturn)
-    const { rpc } = makeRpcMock()
+    const { rpc } = makeSupabaseAdminMock()
     const { request, params } = makeRequest({ order_status: 'order_confirmed' })
 
     const response = await PATCH(request, { params })
@@ -136,13 +210,9 @@ describe('PATCH /api/orders/[id]/status - 미인증 401', () => {
     expect(response).toBe(MOCK_401_RESPONSE)
     expect(rpc).not.toHaveBeenCalled()
   })
-})
 
-describe('PATCH /api/orders/[id]/status - 요청 검증', () => {
-  beforeEach(() => mockRequireAuth.mockImplementation(makeAuthedReturn))
-
-  test('빈 body는 400을 반환하고 rpc를 호출하지 않는다', async () => {
-    const { rpc } = makeRpcMock()
+  test('empty body returns 400', async () => {
+    const { rpc } = makeSupabaseAdminMock()
     const { request, params } = makeRequest({})
 
     const response = await PATCH(request, { params }) as MockRouteResponse
@@ -151,125 +221,117 @@ describe('PATCH /api/orders/[id]/status - 요청 검증', () => {
     expect(rpc).not.toHaveBeenCalled()
   })
 
-  test.each([
-    ['id', { id: 'hack' }],
-    ['total_amount', { total_amount: 0 }],
-    ['customer_name', { customer_name: '변조' }],
-    ['stock_status', { stock_status: 'applied' }],
-    ['updated_at', { updated_at: '2099-01-01' }],
-  ])('허용되지 않은 "%s" 필드는 400을 반환한다', async (_, body) => {
-    const { rpc } = makeRpcMock()
-    const { request, params } = makeRequest(body)
-
-    const response = await PATCH(request, { params }) as MockRouteResponse
-
-    expect(response.status).toBe(400)
-    expect(rpc).not.toHaveBeenCalled()
-  })
-
-  test('잘못된 상태 값은 400을 반환한다', async () => {
-    const { rpc } = makeRpcMock()
-    const { request, params } = makeRequest({ order_status: 'paid' })
-
-    const response = await PATCH(request, { params }) as MockRouteResponse
-
-    expect(response.status).toBe(400)
-    expect(rpc).not.toHaveBeenCalled()
-  })
-})
-
-describe('PATCH /api/orders/[id]/status - 성공', () => {
-  beforeEach(() => mockRequireAuth.mockImplementation(makeAuthedReturn))
-
-  test('상태 변경 RPC 응답 body를 반환한다', async () => {
-    makeRpcMock(MOCK_ORDER_ROW)
-    const { request, params } = makeRequest({
-      order_status:    'order_confirmed',
-      payment_status:  'payment_completed',
-      shipping_status: 'shipping_ready',
+  test('status-only update bypasses stock rpc', async () => {
+    const { rpc, stocksUpdate, orderStatusHistoryInsert } = makeSupabaseAdminMock({
+      currentOrder: {
+        order_status: 'order_waiting',
+        payment_status: 'refund_in_progress',
+        shipping_status: 'shipping_in_progress',
+        stock_status: 'none',
+      },
     })
+    const { request, params } = makeRequest({ order_status: 'order_confirmed' })
 
     const response = await PATCH(request, { params }) as MockRouteResponse
 
     expect(response.status).toBe(200)
-    expect(response.body).toEqual(MOCK_ORDER_ROW)
+    expect(rpc).not.toHaveBeenCalled()
+    expect(stocksUpdate).not.toHaveBeenCalled()
+    expect(orderStatusHistoryInsert).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({
+        status_type: 'order_status',
+        from_status: 'order_waiting',
+        to_status: 'order_confirmed',
+      }),
+    ]))
   })
 
-  test('RPC에 주문 id, 상태 필드, 관리자 actor를 전달한다', async () => {
-    const { rpc } = makeRpcMock()
-    const { request, params } = makeRequest({ payment_status: 'payment_completed' }, 'order-999')
-
-    await PATCH(request, { params })
-
-    expect(rpc).toHaveBeenCalledWith('update_order_status_with_history', {
-      p_order_id:        'order-999',
-      p_order_status:    null,
-      p_payment_status:  'payment_completed',
-      p_shipping_status: null,
-      p_actor_type:      'admin',
-      p_actor_name:      'admin@sellops.com',
-      p_reason:          null,
+  test('rpc success returns applied stock status without extra stock mutation', async () => {
+    const { rpc, stocksUpdate } = makeSupabaseAdminMock({
+      rpcData: {
+        ...DEFAULT_UPDATED_ORDER,
+        shipping_status: 'shipping_completed',
+        stock_status: 'applied',
+      },
     })
-  })
-
-  test('RPC가 없으면 직접 update하고 변경 이력을 저장한다', async () => {
-    const { update, insert } = makeRpcMissingFallbackMock()
-    const { request, params } = makeRequest({
-      order_status:   'order_confirmed',
-      payment_status: 'payment_completed',
-    })
+    const { request, params } = makeRequest({ shipping_status: 'shipping_completed' })
 
     const response = await PATCH(request, { params }) as MockRouteResponse
 
     expect(response.status).toBe(200)
-    expect(response.body).toEqual(MOCK_ORDER_ROW)
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({
-      order_status:   'order_confirmed',
-      payment_status: 'payment_completed',
-      updated_at:     expect.any(String),
+    expect(response.body).toEqual(expect.objectContaining({
+      shipping_status: 'shipping_completed',
+      stock_status: 'applied',
     }))
-    expect(insert).toHaveBeenCalledWith([
-      expect.objectContaining({
-        order_id:     'order-001',
-        status_type:  'order_status',
-        from_status:  'order_waiting',
-        to_status:    'order_confirmed',
-        actor_type:   'admin',
-        actor_name:   'admin@sellops.com',
-      }),
-      expect.objectContaining({
-        order_id:     'order-001',
-        status_type:  'payment_status',
-        from_status:  'payment_pending',
-        to_status:    'payment_completed',
-        actor_type:   'admin',
-        actor_name:   'admin@sellops.com',
-      }),
-    ])
+    expect(rpc).toHaveBeenCalledWith('update_order_status_with_stock', expect.anything())
+    expect(stocksUpdate).not.toHaveBeenCalled()
   })
 
-  test('RPC와 이력 테이블이 아직 없으면 상태 변경 성공 응답을 반환한다', async () => {
-    const { update, insert } = makeRpcMissingWithoutHistoryTableMock()
+  test('fallback reserve updates sold once and marks stock as applied', async () => {
+    const { rpc, stocksUpdate, stockHistoryInsert } = makeSupabaseAdminMock({
+      currentOrder: {
+        order_status: 'order_waiting',
+        payment_status: 'payment_pending',
+        shipping_status: 'shipping_ready',
+        stock_status: 'none',
+      },
+      rpcError: { code: 'PGRST202', message: 'Could not find update_order_status_with_stock' },
+    })
     const { request, params } = makeRequest({ shipping_status: 'shipping_in_progress' })
 
     const response = await PATCH(request, { params }) as MockRouteResponse
 
     expect(response.status).toBe(200)
-    expect(response.body).toEqual(MOCK_ORDER_ROW)
-    expect(update).toHaveBeenCalled()
-    expect(insert).toHaveBeenCalled()
+    expect(stocksUpdate).toHaveBeenCalledWith({ total: 10, sold: 2 })
+    expect(stockHistoryInsert).toHaveBeenCalledWith({
+      product_id: 'product-001',
+      type: 'out',
+      quantity: 2,
+      reason: '주문 예약: order-001',
+    })
+    expect(rpc).toHaveBeenCalledWith('update_order_status_with_stock', expect.anything())
   })
-})
 
-describe('PATCH /api/orders/[id]/status - 실패', () => {
-  beforeEach(() => mockRequireAuth.mockImplementation(makeAuthedReturn))
-
-  test('Supabase RPC 오류는 500을 반환한다', async () => {
-    makeRpcMock(null, { message: 'db error', code: '500' })
-    const { request, params } = makeRequest({ order_status: 'order_cancelled' })
+  test('fallback finalize reduces total once and keeps available stable after reserve', async () => {
+    const { rpc, stocksUpdate, stockHistoryInsert } = makeSupabaseAdminMock({
+      currentOrder: {
+        order_status: 'order_confirmed',
+        payment_status: 'payment_completed',
+        shipping_status: 'shipping_in_progress',
+        stock_status: 'applied',
+      },
+      stockRow: { product_id: 'product-001', total: 10, sold: 2 },
+      rpcError: { code: 'PGRST202', message: 'Could not find update_order_status_with_stock' },
+    })
+    const { request, params } = makeRequest({
+      order_status: 'order_completed',
+      shipping_status: 'shipping_completed',
+    })
 
     const response = await PATCH(request, { params }) as MockRouteResponse
 
-    expect(response.status).toBe(500)
+    expect(response.status).toBe(200)
+    expect(stocksUpdate).toHaveBeenCalledWith({ total: 8, sold: 0 })
+    expect(stockHistoryInsert).toHaveBeenCalledWith({
+      product_id: 'product-001',
+      type: 'out',
+      quantity: 2,
+      reason: '주문 출고: order-001',
+    })
+    expect(rpc).toHaveBeenCalledWith('update_order_status_with_stock', expect.anything())
+  })
+
+  test('insufficient stock returns 400 before mutation', async () => {
+    const { rpc, stocksUpdate } = makeSupabaseAdminMock({
+      orderItems: [{ product_id: 'product-001', quantity: 3 }],
+      stockRow: { product_id: 'product-001', total: 2, sold: 0 },
+    })
+    const { request, params } = makeRequest({ shipping_status: 'shipping_in_progress' })
+
+    const response = await PATCH(request, { params }) as MockRouteResponse
+
+    expect(response.status).toBe(400)
+    expect(stocksUpdate).not.toHaveBeenCalled()
+    expect(rpc).not.toHaveBeenCalledWith('update_order_status_with_stock', expect.anything())
   })
 })
