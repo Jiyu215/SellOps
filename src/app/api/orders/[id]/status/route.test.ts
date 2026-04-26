@@ -22,6 +22,10 @@ jest.mock('next/server', () => ({
 
 jest.mock('@/lib/supabase/admin', () => ({ getSupabaseAdmin: jest.fn() }))
 jest.mock('@/lib/api/requireAuth')
+jest.mock('@/lib/notifications', () => ({
+  createNotifications: jest.fn().mockResolvedValue(undefined),
+  createNotification:  jest.fn().mockResolvedValue(undefined),
+}))
 
 import type { User } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
@@ -85,6 +89,7 @@ type MockOptions = {
   }
   orderItems?: Array<{ product_id: string; quantity: number }>
   stockRow?: { product_id: string; total: number; sold: number }
+  stockError?: { code?: string; message?: string } | null
   rpcData?: unknown
   rpcError?: { code?: string; message?: string } | null
 }
@@ -102,9 +107,10 @@ function makeSupabaseAdminMock(options: MockOptions = {}) {
   const rpcData = options.rpcData ?? DEFAULT_UPDATED_ORDER
   const rpcError = options.rpcError ?? null
 
+  const stockError = options.stockError ?? null
   const ordersSelectSingle = jest.fn().mockResolvedValue({ data: currentOrder, error: null })
   const orderItemsEq = jest.fn().mockResolvedValue({ data: orderItems, error: null })
-  const stockSelectSingle = jest.fn().mockResolvedValue({ data: stockRow, error: null })
+  const stockSelectSingle = jest.fn().mockResolvedValue({ data: stockError ? null : stockRow, error: stockError })
   const stockHistoryInsert = jest.fn().mockResolvedValue({ error: null })
   const orderStatusHistoryInsert = jest.fn().mockResolvedValue({ error: null })
 
@@ -226,6 +232,7 @@ describe('PATCH /api/orders/[id]/status', () => {
   test('status-only update bypasses stock rpc', async () => {
     const { rpc, stocksUpdate, orderStatusHistoryInsert } = makeSupabaseAdminMock({
       currentOrder: {
+        order_number: 'SO-2026-000001',
         order_status: 'order_waiting',
         payment_status: 'refund_in_progress',
         shipping_status: 'shipping_in_progress',
@@ -335,6 +342,27 @@ describe('PATCH /api/orders/[id]/status', () => {
     const response = await PATCH(request, { params }) as MockRouteResponse
 
     expect(response.status).toBe(400)
+    expect(stocksUpdate).not.toHaveBeenCalled()
+    expect(rpc).not.toHaveBeenCalledWith('update_order_status_with_stock', expect.anything())
+  })
+
+  test('missing stock row (PGRST116) returns 404 not 500 during 배송시작', async () => {
+    const { rpc, stocksUpdate } = makeSupabaseAdminMock({
+      currentOrder: {
+        order_number: 'SO-2026-000001',
+        order_status: 'order_confirmed',
+        payment_status: 'payment_completed',
+        shipping_status: 'shipping_ready',
+        stock_status: 'none',
+      },
+      stockError: { code: 'PGRST116', message: 'The result contains 0 rows' },
+    })
+    const { request, params } = makeRequest({ shipping_status: 'shipping_in_progress' })
+
+    const response = await PATCH(request, { params }) as MockRouteResponse
+
+    expect(response.status).toBe(404)
+    expect((response.body as { error: string }).error).toBe('상품 재고 정보를 찾을 수 없습니다.')
     expect(stocksUpdate).not.toHaveBeenCalled()
     expect(rpc).not.toHaveBeenCalledWith('update_order_status_with_stock', expect.anything())
   })

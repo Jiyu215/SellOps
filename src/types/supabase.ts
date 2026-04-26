@@ -407,6 +407,39 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          id:         string
+          type:       string
+          level:      string
+          title:      string
+          message:    string
+          link:       string | null
+          is_read:    boolean
+          created_at: string
+        }
+        Insert: {
+          id?:        string
+          type:       string
+          level:      string
+          title:      string
+          message:    string
+          link?:      string | null
+          is_read?:   boolean
+          created_at?: string
+        }
+        Update: {
+          id?:        string
+          type?:      string
+          level?:     string
+          title?:     string
+          message?:   string
+          link?:      string | null
+          is_read?:   boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
       stocks: {
         Row: {
           product_id: string

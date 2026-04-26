@@ -15,6 +15,7 @@ export const MOCK_PRODUCT_DETAIL: ProductDetail = {
   id:               'prod-001',
   productCode:      'KB-MXS-BLK',
   name:             'MX Keys S 키보드 블랙',
+  categoryId:       'cat-keyboard',
   category:         '키보드',
   price:            139000,
   summary:          '로지텍 MX Keys S 풀사이즈 멀티 디바이스 키보드 블랙 색상입니다.',

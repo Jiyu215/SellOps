@@ -4,6 +4,8 @@ import { orderStatusUpdateSchema } from '@/features/orders/schemas/order.schema'
 import type { OrderStatusUpdateInput } from '@/features/orders/schemas/order.schema'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import type { Tables } from '@/types/supabase'
+import { createNotifications } from '@/lib/notifications'
+import type { CreateNotificationParams } from '@/lib/notifications'
 
 type SupabaseAdmin = ReturnType<typeof getSupabaseAdmin>
 type OrderRow = Tables<'orders'>
@@ -127,7 +129,12 @@ async function readStockRow(supabaseAdmin: SupabaseAdmin, productId: string) {
     .eq('product_id', productId)
     .single()
 
-  if (error) throw error
+  if (error) {
+    if (error.code === 'PGRST116') {
+      throw new OrderStockError(404, '상품 재고 정보를 찾을 수 없습니다.')
+    }
+    throw error
+  }
   return data as StockSnapshot
 }
 
@@ -144,7 +151,12 @@ async function updateStockRow(
     .select('product_id')
     .single()
 
-  if (error) throw error
+  if (error) {
+    if (error.code === 'PGRST116') {
+      throw new OrderStockError(404, '상품 재고 정보를 찾을 수 없습니다.')
+    }
+    throw error
+  }
 }
 
 async function insertStockHistory(
@@ -341,6 +353,42 @@ async function updateOrderStatusDirectly(
   return updated
 }
 
+function buildOrderStatusNotifications(
+  update: OrderStatusUpdateInput,
+  current: OrderStatusSnapshot,
+  orderId: string,
+): CreateNotificationParams[] {
+  const notifications: CreateNotificationParams[] = []
+
+  if (
+    update.order_status === 'order_cancelled' &&
+    current.order_status !== 'order_cancelled'
+  ) {
+    notifications.push({
+      type:    'order',
+      level:   'warning',
+      title:   '주문 취소 요청',
+      message: `주문 ${current.order_number} 취소 요청이 접수되었습니다.`,
+      link:    `/dashboard/orders/${orderId}`,
+    })
+  }
+
+  if (
+    update.payment_status === 'refund_completed' &&
+    current.payment_status !== 'refund_completed'
+  ) {
+    notifications.push({
+      type:    'order',
+      level:   'info',
+      title:   '환불 처리 완료',
+      message: `주문 ${current.order_number} 환불이 완료되었습니다.`,
+      link:    `/dashboard/orders/${orderId}`,
+    })
+  }
+
+  return notifications
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -386,6 +434,9 @@ export async function PATCH(
         currentStatus,
       )
 
+      const notifications = buildOrderStatusNotifications(parsed.data, currentStatus, id)
+      if (notifications.length > 0) void createNotifications(notifications)
+
       return NextResponse.json(updatedOrder)
     }
 
@@ -416,11 +467,17 @@ export async function PATCH(
         currentStatus,
       )
 
+      const notifications = buildOrderStatusNotifications(parsed.data, currentStatus, id)
+      if (notifications.length > 0) void createNotifications(notifications)
+
       return NextResponse.json({
         ...updatedOrder,
         stock_status: stockStatus,
       })
     }
+
+    const notifications = buildOrderStatusNotifications(parsed.data, currentStatus, id)
+    if (notifications.length > 0) void createNotifications(notifications)
 
     return NextResponse.json(data as OrderRow)
   } catch (error) {

@@ -1,44 +1,45 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
-import { OrderDetailContent } from './OrderDetailContent'
-import type { OrderDetail, OrderMemoActor } from '@/types/orderDetail'
-import { createOrderMemo, fetchOrderDetail, updateOrderStatus } from '@/features/orders/api/order.api'
+import { act, render, screen, waitFor } from '@testing-library/react';
+import { OrderDetailContent } from './OrderDetailContent';
+import type { OrderDetail, OrderMemoActor } from '@/types/orderDetail';
+import { createOrderMemo, fetchOrderDetail, updateOrderStatus } from '@/features/orders/api/order.api';
 
 let latestOrderDetailViewProps: {
-  order: OrderDetail
-  currentMemoActor: OrderMemoActor
+  order: OrderDetail;
+  currentMemoActor: OrderMemoActor;
   onOrderUpdate: (
     id: string,
     partial: Partial<Pick<OrderDetail, 'orderStatus' | 'paymentStatus' | 'shippingStatus'>>
-  ) => void | Promise<void>
-  onMemoCreate: (id: string, content: string) => void | Promise<void>
-} | null = null
+  ) => void | Promise<void>;
+  onMemoCreate: (id: string, content: string) => void | Promise<void>;
+} | null = null;
 
 jest.mock('@/components/dashboard/orders/OrderDetailView', () => ({
   OrderDetailView: (props: typeof latestOrderDetailViewProps) => {
-    latestOrderDetailViewProps = props
+    latestOrderDetailViewProps = props;
     return (
       <div>
         <div data-testid="order-status">{props?.order.shippingStatus}</div>
         <div data-testid="history-count">{props?.order.statusHistory.length}</div>
         <div data-testid="memo-count">{props?.order.memoLog.length}</div>
       </div>
-    )
+    );
   },
-}))
+}));
 
 jest.mock('@/features/orders/api/order.api', () => ({
   createOrderMemo: jest.fn(),
   fetchOrderDetail: jest.fn(),
   updateOrderStatus: jest.fn(),
-}))
+}));
 
-const mockCreateOrderMemo = createOrderMemo as jest.MockedFunction<typeof createOrderMemo>
-const mockFetchOrderDetail = fetchOrderDetail as jest.MockedFunction<typeof fetchOrderDetail>
-const mockUpdateOrderStatus = updateOrderStatus as jest.MockedFunction<typeof updateOrderStatus>
+const mockCreateOrderMemo = createOrderMemo as jest.MockedFunction<typeof createOrderMemo>;
+const mockFetchOrderDetail = fetchOrderDetail as jest.MockedFunction<typeof fetchOrderDetail>;
+const mockUpdateOrderStatus = updateOrderStatus as jest.MockedFunction<typeof updateOrderStatus>;
+
 const MOCK_MEMO_ACTOR: OrderMemoActor = {
-  name: '김운영자',
+  name: '김운영',
   type: 'admin',
-}
+};
 
 const MOCK_ORDER_DETAIL: OrderDetail = {
   id: 'order-001',
@@ -65,16 +66,16 @@ const MOCK_ORDER_DETAIL: OrderDetail = {
   shippingFee: 0,
   memoLog: [],
   statusHistory: [],
-}
+};
 
 beforeEach(() => {
-  jest.clearAllMocks()
-  latestOrderDetailViewProps = null
-})
+  jest.clearAllMocks();
+  latestOrderDetailViewProps = null;
+});
 
 describe('OrderDetailContent', () => {
-  test('상태 변경 후 상세를 다시 조회해 상태 이력을 동기화한다', async () => {
-    mockUpdateOrderStatus.mockResolvedValue()
+  test('상태 변경 성공 시 상세를 다시 조회하고 상태 이력을 갱신한다', async () => {
+    mockUpdateOrderStatus.mockResolvedValue();
     mockFetchOrderDetail.mockResolvedValue({
       ...MOCK_ORDER_DETAIL,
       shippingStatus: 'shipping_in_progress',
@@ -85,32 +86,32 @@ describe('OrderDetailContent', () => {
           actor: 'admin@sellops.com',
         },
       ],
-    })
+    });
 
-    render(<OrderDetailContent initialOrderDetail={MOCK_ORDER_DETAIL} currentMemoActor={MOCK_MEMO_ACTOR} />)
+    render(<OrderDetailContent initialOrderDetail={MOCK_ORDER_DETAIL} currentMemoActor={MOCK_MEMO_ACTOR} />);
 
-    expect(screen.getByTestId('order-status')).toHaveTextContent('shipping_ready')
-    expect(screen.getByTestId('history-count')).toHaveTextContent('0')
+    expect(screen.getByTestId('order-status')).toHaveTextContent('shipping_ready');
+    expect(screen.getByTestId('history-count')).toHaveTextContent('0');
 
     await act(async () => {
       await latestOrderDetailViewProps?.onOrderUpdate('order-001', {
         shippingStatus: 'shipping_in_progress',
-      })
-    })
+      });
+    });
 
     await waitFor(() => {
       expect(mockUpdateOrderStatus).toHaveBeenCalledWith('order-001', {
         shippingStatus: 'shipping_in_progress',
-      })
-    })
+      });
+    });
 
-    expect(mockFetchOrderDetail).toHaveBeenCalledWith('order-001')
-    expect(screen.getByTestId('order-status')).toHaveTextContent('shipping_in_progress')
-    expect(screen.getByTestId('history-count')).toHaveTextContent('1')
-  })
+    expect(mockFetchOrderDetail).toHaveBeenCalledWith('order-001');
+    expect(screen.getByTestId('order-status')).toHaveTextContent('shipping_in_progress');
+    expect(screen.getByTestId('history-count')).toHaveTextContent('1');
+  });
 
-  test('메모 등록 후 상세를 다시 조회해 메모 로그를 동기화한다', async () => {
-    mockCreateOrderMemo.mockResolvedValue()
+  test('메모 등록 성공 시 상세를 다시 조회하고 메모 로그를 갱신한다', async () => {
+    mockCreateOrderMemo.mockResolvedValue();
     mockFetchOrderDetail.mockResolvedValue({
       ...MOCK_ORDER_DETAIL,
       memoLog: [
@@ -122,40 +123,40 @@ describe('OrderDetailContent', () => {
           content: '고객 요청 메모',
         },
       ],
-    })
+    });
 
-    render(<OrderDetailContent initialOrderDetail={MOCK_ORDER_DETAIL} currentMemoActor={MOCK_MEMO_ACTOR} />)
+    render(<OrderDetailContent initialOrderDetail={MOCK_ORDER_DETAIL} currentMemoActor={MOCK_MEMO_ACTOR} />);
 
-    expect(screen.getByTestId('memo-count')).toHaveTextContent('0')
+    expect(screen.getByTestId('memo-count')).toHaveTextContent('0');
 
     await act(async () => {
-      await latestOrderDetailViewProps?.onMemoCreate('order-001', '고객 요청 메모')
-    })
+      await latestOrderDetailViewProps?.onMemoCreate('order-001', '고객 요청 메모');
+    });
 
     await waitFor(() => {
-      expect(mockCreateOrderMemo).toHaveBeenCalledWith('order-001', '고객 요청 메모')
-    })
+      expect(mockCreateOrderMemo).toHaveBeenCalledWith('order-001', '고객 요청 메모');
+    });
 
-    expect(mockFetchOrderDetail).toHaveBeenCalledWith('order-001')
-    expect(screen.getByTestId('memo-count')).toHaveTextContent('1')
-  })
+    expect(mockFetchOrderDetail).toHaveBeenCalledWith('order-001');
+    expect(screen.getByTestId('memo-count')).toHaveTextContent('1');
+  });
 
-  test('API 실패 시 에러 메시지를 보여주고 상태를 유지한다', async () => {
-    mockUpdateOrderStatus.mockRejectedValue(new Error('db error'))
+  test('상태 변경 실패 시 서버 오류 메시지를 그대로 보여주고 상태를 유지한다', async () => {
+    mockUpdateOrderStatus.mockRejectedValue(new Error('가용 재고보다 많은 수량입니다. (가용: 0개)'));
 
-    render(<OrderDetailContent initialOrderDetail={MOCK_ORDER_DETAIL} currentMemoActor={MOCK_MEMO_ACTOR} />)
+    render(<OrderDetailContent initialOrderDetail={MOCK_ORDER_DETAIL} currentMemoActor={MOCK_MEMO_ACTOR} />);
 
     await act(async () => {
       await latestOrderDetailViewProps?.onOrderUpdate('order-001', {
         shippingStatus: 'shipping_in_progress',
-      })
-    })
+      });
+    });
 
     await waitFor(() => {
-      expect(screen.getByText('주문 상태 변경에 실패했습니다.')).toBeInTheDocument()
-    })
+      expect(screen.getByText('가용 재고보다 많은 수량입니다. (가용: 0개)')).toBeInTheDocument();
+    });
 
-    expect(mockFetchOrderDetail).not.toHaveBeenCalled()
-    expect(screen.getByTestId('order-status')).toHaveTextContent('shipping_ready')
-  })
-})
+    expect(mockFetchOrderDetail).not.toHaveBeenCalled();
+    expect(screen.getByTestId('order-status')).toHaveTextContent('shipping_ready');
+  });
+});

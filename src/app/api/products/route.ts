@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { ProductCreateBody, ProductStatus, SortOption } from '@/features/products/types/product.type'
 import { requireAuth } from '@/lib/api/requireAuth'
+import { createNotification } from '@/lib/notifications'
 
 
 export async function GET(request: Request) {
@@ -146,6 +147,14 @@ export async function POST(request: Request) {
     await supabaseAdmin
       .from('stocks')
       .upsert({ product_id: data.id, total: 0, sold: 0 }, { onConflict: 'product_id' })
+
+    void createNotification({
+      type:    'product',
+      level:   'info',
+      title:   '상품 등록 완료',
+      message: `[${data.name}] 상품이 등록되었습니다.`,
+      link:    `/dashboard/products/${data.id}`,
+    })
 
     return NextResponse.json(data, { status: 201 })
   } catch {

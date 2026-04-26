@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import type { ImageType, ImageFormat } from '@/features/products/types/product.type'
 import { requireAuth } from '@/lib/api/requireAuth'
+import { createNotification } from '@/lib/notifications'
 
 const ALLOWED_FORMATS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
 const MAX_SIZE_MB = 10
@@ -60,7 +61,16 @@ export async function POST(
       .from('product-images')
       .upload(path, file, { upsert: false })
 
-    if (storageError) throw storageError
+    if (storageError) {
+      void createNotification({
+        type:    'system',
+        level:   'warning',
+        title:   '이미지 업로드 실패',
+        message: '이미지 업로드에 실패했습니다. 다시 시도해주세요.',
+        link:    `/dashboard/products/${id}`,
+      })
+      throw storageError
+    }
 
     // Public URL 획득
     const { data: { publicUrl } } = supabaseAdmin.storage

@@ -11,6 +11,18 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { DashboardLayout } from './DashboardLayout';
 import type { UserProfile, Notification } from '@/types/dashboard';
 
+// ── Supabase 클라이언트 모킹 (Realtime 구독이 테스트 환경에서 실패하지 않도록) ──
+
+jest.mock('@/lib/supabase/client', () => ({
+  createClient: () => ({
+    channel: () => ({
+      on:        function() { return this; },
+      subscribe: () => ({}),
+    }),
+    removeChannel: jest.fn(),
+  }),
+}));
+
 // ── next/navigation 모킹 ──────────────────────────────────────────────────────
 
 const mockPush = jest.fn();
@@ -58,7 +70,7 @@ jest.mock('./Header', () => ({
       <h1 data-testid="page-title">{pageTitle}</h1>
       <span data-testid="notif-count">{notifications.length}</span>
       <span data-testid="unread-count">
-        {notifications.filter((n) => !n.isRead).length}
+        {notifications.filter((n) => !n.is_read).length}
       </span>
       <button onClick={() => onMarkRead('notif-001')} data-testid="mark-read">읽음</button>
       <button onClick={onMarkAllRead} data-testid="mark-all-read">전체읽음</button>
@@ -86,9 +98,11 @@ function makeNotification(overrides: Partial<Notification> = {}): Notification {
     id:        'notif-001',
     title:     '알림',
     message:   '테스트 메시지',
-    type:      'low_stock',
-    isRead:    false,
-    createdAt: new Date().toISOString(),
+    type:      'inventory',
+    level:     'info',
+    link:      null,
+    is_read:   false,
+    created_at: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -298,8 +312,8 @@ describe('DashboardLayout - nativeScroll prop (PR 변경사항)', () => {
 
 describe('DashboardLayout - notifications 상태 관리', () => {
   const notifications = [
-    makeNotification({ id: 'notif-001', isRead: false }),
-    makeNotification({ id: 'notif-002', isRead: false }),
+    makeNotification({ id: 'notif-001', is_read: false }),
+    makeNotification({ id: 'notif-002', is_read: false }),
   ];
 
   test('초기 알림 목록이 전달된다', () => {

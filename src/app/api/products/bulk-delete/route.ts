@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/requireAuth'
+import { createNotification } from '@/lib/notifications'
 
 /** Storage에서 product_images 버킷의 파일들을 일괄 삭제 */
 async function deleteStorageImages(productIds: string[]): Promise<void> {
@@ -46,6 +47,13 @@ export async function DELETE(request: Request) {
     })
 
     if (!rpcError) {
+      void createNotification({
+        type:    'product',
+        level:   'warning',
+        title:   '상품 일괄 삭제',
+        message: `${ids.length}개 상품이 삭제되었습니다.`,
+        link:    '/dashboard/products',
+      })
       return NextResponse.json({ success: true })
     }
 
@@ -65,6 +73,14 @@ export async function DELETE(request: Request) {
       .in('id', ids)
 
     if (error) throw error
+
+    void createNotification({
+      type:    'product',
+      level:   'warning',
+      title:   '상품 일괄 삭제',
+      message: `${ids.length}개 상품이 삭제되었습니다.`,
+      link:    '/dashboard/products',
+    })
 
     return NextResponse.json({ success: true })
   } catch {

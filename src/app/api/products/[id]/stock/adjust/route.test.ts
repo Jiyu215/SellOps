@@ -22,6 +22,10 @@ jest.mock('next/server', () => ({
 
 jest.mock('@/lib/supabase/admin', () => ({ getSupabaseAdmin: jest.fn() }))
 jest.mock('@/lib/api/requireAuth')
+jest.mock('@/lib/notifications', () => ({
+  createNotifications: jest.fn().mockResolvedValue(undefined),
+  createNotification:  jest.fn().mockResolvedValue(undefined),
+}))
 
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/requireAuth'
@@ -68,9 +72,13 @@ function makeRequest(body: unknown, productId = 'prod-001') {
 }
 
 function makeRpcMock(rpcResult: unknown, rpcError: unknown = null) {
-  const rpc = jest.fn().mockResolvedValue({ data: rpcResult, error: rpcError })
-  ;(getSupabaseAdmin as jest.Mock).mockReturnValue({ rpc })
-  return { rpc }
+  const rpc    = jest.fn().mockResolvedValue({ data: rpcResult, error: rpcError })
+  const single = jest.fn().mockResolvedValue({ data: { name: 'Mock Product', status: 'active' }, error: null })
+  const eq     = jest.fn().mockReturnValue({ single })
+  const select = jest.fn().mockReturnValue({ eq })
+  const from   = jest.fn().mockReturnValue({ select })
+  ;(getSupabaseAdmin as jest.Mock).mockReturnValue({ rpc, from })
+  return { rpc, from }
 }
 
 beforeEach(() => {

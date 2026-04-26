@@ -2,8 +2,8 @@ import { Suspense } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { DashboardContent } from '@/components/dashboard/DashboardContent';
 import { DashboardSkeleton } from '@/components/dashboard/skeletons';
-import { MOCK_NOTIFICATIONS } from '@/constants/mockData';
 import { getDashboardUser } from '@/lib/dashboard/currentUser';
+import { getInitialNotifications } from '@/lib/dashboard/getInitialNotifications';
 
 /**
  * 대시보드 메인 페이지 (Server Component)
@@ -13,13 +13,16 @@ import { getDashboardUser } from '@/lib/dashboard/currentUser';
  * - useSearchParams 기반 주문 필터를 위해 Suspense로 감싼다
  */
 export default async function DashboardPage() {
-  const currentUser = await getDashboardUser();
+  const [currentUser, notifications] = await Promise.all([
+    getDashboardUser(),
+    getInitialNotifications(),
+  ]);
 
   return (
     <DashboardLayout
       currentUser={currentUser}
       pageTitle="대시보드"
-      notifications={MOCK_NOTIFICATIONS}
+      notifications={notifications}
     >
       <Suspense fallback={<DashboardSkeleton />}>
         <DashboardContent />

@@ -1,5 +1,5 @@
 import { DashboardLayout, DashboardSkeleton } from '@/components/dashboard';
-import { MOCK_USER, MOCK_NOTIFICATIONS } from '@/constants/mockData';
+import { MOCK_USER } from '@/constants/mockData';
 
 /**
  * Next.js App Router 자동 로딩 UI
@@ -13,7 +13,7 @@ export default function DashboardLoading() {
     <DashboardLayout
       currentUser={MOCK_USER}
       pageTitle="대시보드"
-      notifications={MOCK_NOTIFICATIONS}
+      notifications={[]}
     >
       <DashboardSkeleton />
     </DashboardLayout>

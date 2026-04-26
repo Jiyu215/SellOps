@@ -1,10 +1,10 @@
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
-import { MOCK_NOTIFICATIONS } from '@/constants/mockData';
 import { getProductCategoryOptions } from '@/dal/categories';
 import { getProductById } from '@/dal/products';
 import { getDashboardUser } from '@/lib/dashboard/currentUser';
+import { getInitialNotifications } from '@/lib/dashboard/getInitialNotifications';
 import { ProductDetailContent } from './ProductDetailContent';
 import { ProductDetailSkeleton } from './ProductDetailSkeleton';
 
@@ -27,10 +27,13 @@ export async function generateMetadata({ params }: ProductDetailPageProps) {
 }
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
-  const { id }  = await params;
-  const product = await getProductById(id);
-  const currentUser = await getDashboardUser();
-  const categoryOptions = await getProductCategoryOptions();
+  const { id } = await params;
+  const [product, currentUser, categoryOptions, notifications] = await Promise.all([
+    getProductById(id),
+    getDashboardUser(),
+    getProductCategoryOptions(),
+    getInitialNotifications(),
+  ]);
 
   if (!product) notFound();
 
@@ -38,7 +41,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     <DashboardLayout
       currentUser={currentUser}
       pageTitle={product.name}
-      notifications={MOCK_NOTIFICATIONS}
+      notifications={notifications}
       nativeScroll
     >
       <Suspense fallback={<ProductDetailSkeleton />}>

@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import type { ProductStatus } from '@/features/products/types/product.type'
 import { requireAuth } from '@/lib/api/requireAuth'
+import { createNotification } from '@/lib/notifications'
 
 export async function GET(request: Request) {
   const auth = await requireAuth()
@@ -50,6 +51,14 @@ export async function GET(request: Request) {
     )
 
     const csv = '\uFEFF' + [header, ...rows].join('\n') // BOM for 한글 깨짐 방지
+
+    void createNotification({
+      type:    'system',
+      level:   'info',
+      title:   'CSV Export 완료',
+      message: 'CSV 파일 내보내기가 완료되었습니다.',
+      link:    null,
+    })
 
     return new NextResponse(csv, {
       headers: {

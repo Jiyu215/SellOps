@@ -1,9 +1,9 @@
 import { Suspense } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
-import { MOCK_NOTIFICATIONS } from '@/constants/mockData';
 import { ProductsContent } from './ProductsContent';
 import { ProductsPageSkeleton } from './ProductsPageSkeleton';
 import { getDashboardUser } from '@/lib/dashboard/currentUser';
+import { getInitialNotifications } from '@/lib/dashboard/getInitialNotifications';
 import { createClient } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import type { ProductListItem, ProductStatus } from '@/types/products';
@@ -15,7 +15,10 @@ import type { ProductListItem, ProductStatus } from '@/types/products';
  * - revalidatePath 후 서버 재렌더 시 최신 목록 자동 반영
  */
 export default async function ProductsPage() {
-  const currentUser = await getDashboardUser();
+  const [currentUser, notifications] = await Promise.all([
+    getDashboardUser(),
+    getInitialNotifications(),
+  ]);
   const supabase = await createClient();
 
   const { data: items } = await supabase
@@ -64,7 +67,7 @@ export default async function ProductsPage() {
     <DashboardLayout
       currentUser={currentUser}
       pageTitle="상품 관리"
-      notifications={MOCK_NOTIFICATIONS}
+      notifications={notifications}
     >
       <Suspense fallback={<ProductsPageSkeleton />}>
         <ProductsContent initialProducts={initialProducts} />

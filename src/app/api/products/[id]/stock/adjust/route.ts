@@ -2,6 +2,8 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/requireAuth'
 import { stockAdjustSchema } from '@/features/products/schemas/product.schema'
+import { createNotifications } from '@/lib/notifications'
+import type { CreateNotificationParams } from '@/lib/notifications'
 
 type AdjustStockOk = {
   product_id: string
@@ -80,6 +82,57 @@ export async function POST(
         )
       }
     }
+
+    // 재고 알림 생성 (비동기, 실패해도 응답에 영향 없음)
+    const ok = result as AdjustStockOk
+    void (async () => {
+      const notifications: CreateNotificationParams[] = [
+        {
+          type:    'inventory',
+          level:   'info',
+          title:   '재고 조정 완료',
+          message: `재고가 ${quantity}개 ${type === 'in' ? '입고' : '출고'} 처리되었습니다.`,
+          link:    `/dashboard/products/${ok.product_id}`,
+        },
+      ]
+
+      const { data: product } = await supabaseAdmin
+        .from('products')
+        .select('name, status')
+        .eq('id', ok.product_id)
+        .single()
+
+      const productName = product?.name ?? ok.product_id
+
+      if (ok.available === 0) {
+        notifications.push({
+          type:    'inventory',
+          level:   'critical',
+          title:   '재고 소진',
+          message: `[${productName}] 재고가 소진되었습니다.`,
+          link:    `/dashboard/products/${ok.product_id}`,
+        })
+        if (product?.status === 'active') {
+          notifications.push({
+            type:    'inventory',
+            level:   'critical',
+            title:   '품절 상품 판매중 상태',
+            message: `[${productName}] 재고가 없지만 판매중 상태입니다. 상태를 변경해주세요.`,
+            link:    `/dashboard/products/${ok.product_id}`,
+          })
+        }
+      } else if (ok.available >= 1 && ok.available <= 9) {
+        notifications.push({
+          type:    'inventory',
+          level:   'warning',
+          title:   '재고 부족 임박',
+          message: `[${productName}] 재고가 ${ok.available}개 남았습니다.`,
+          link:    `/dashboard/products/${ok.product_id}`,
+        })
+      }
+
+      await createNotifications(notifications)
+    })()
 
     return NextResponse.json(result)
   } catch {

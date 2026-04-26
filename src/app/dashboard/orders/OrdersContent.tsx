@@ -15,10 +15,10 @@ interface OrdersContentProps {
 }
 
 /**
- * 주문 관리 페이지 콘텐츠 (Client Component)
+ * 주문 관리 페이지 콘텐츠(Client Component)
  *
  * useSearchParams(useOrderFilter 내부)를 사용하므로 Suspense 바운더리 필요.
- * 실제 서비스에서는 서버 액션 또는 React Query로 데이터를 패칭한다.
+ * 실제 서비스에서는 서버 액션 또는 React Query로 데이터를 수집한다.
  */
 export const OrdersContent = ({
   initialOrders,
@@ -34,12 +34,12 @@ export const OrdersContent = ({
   const [errorMsg, setErrorMsg] = useState('');
 
   const query = useMemo<OrderListQuery>(() => ({
-    search:         filter.search,
-    orderStatus:    filter.orderStatus === 'all' ? '' : filter.orderStatus,
-    paymentStatus:  filter.paymentStatus === 'all' ? '' : filter.paymentStatus,
+    search: filter.search,
+    orderStatus: filter.orderStatus === 'all' ? '' : filter.orderStatus,
+    paymentStatus: filter.paymentStatus === 'all' ? '' : filter.paymentStatus,
     shippingStatus: filter.shippingStatus === 'all' ? '' : filter.shippingStatus,
-    paymentMethod:  filter.paymentMethod === 'all' ? '' : filter.paymentMethod,
-    page:           currentPage,
+    paymentMethod: filter.paymentMethod === 'all' ? '' : filter.paymentMethod,
+    page: currentPage,
     limit,
   }), [
     filter.search,
@@ -86,13 +86,17 @@ export const OrdersContent = ({
       try {
         await updateOrderStatus(id, partial);
         setErrorMsg('');
-      } catch {
-        setErrorMsg('주문 상태 변경에 실패했습니다.');
+      } catch (error) {
+        setErrorMsg(
+          error instanceof Error && error.message
+            ? error.message
+            : '주문 상태 변경에 실패했습니다.',
+        );
         return;
       }
 
       setOrders((prev) =>
-        prev.map((o) => (o.id === id ? { ...o, ...partial } : o)),
+        prev.map((order) => (order.id === id ? { ...order, ...partial } : order)),
       );
     },
     [],

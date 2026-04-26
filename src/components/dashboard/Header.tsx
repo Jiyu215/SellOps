@@ -19,6 +19,8 @@ interface HeaderProps {
   notifications?: Notification[];
   onMarkRead?: (id: string) => void;
   onMarkAllRead?: () => void;
+  /** 벨 아이콘 클릭 시 최신 알림 fetch 트리거 */
+  onRefreshNotifications?: () => void;
   pageTitle?: string;
   /** 모바일 사이드바 열림 상태 (DashboardLayout 에서 전달) */
   mobileMenuOpen?: boolean;
@@ -44,6 +46,7 @@ export const Header = ({
   notifications = [],
   onMarkRead,
   onMarkAllRead,
+  onRefreshNotifications,
   pageTitle = '대시보드',
   mobileMenuOpen = false,
   onMobileMenuToggle,
@@ -54,7 +57,7 @@ export const Header = ({
 
   const notificationWrapperRef = useRef<HTMLDivElement>(null);
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
   const initials = currentUser.name.slice(0, 2);
 
   // 알림 드롭다운 바깥 클릭 또는 Escape 키 입력 시 닫기
@@ -146,7 +149,11 @@ export const Header = ({
           <div ref={notificationWrapperRef} className="relative">
             <button
               type="button"
-              onClick={() => setNotificationOpen((prev) => !prev)}
+              onClick={() => {
+                const opening = !notificationOpen;
+                setNotificationOpen(opening);
+                if (opening) onRefreshNotifications?.();
+              }}
               className="relative flex items-center justify-center w-9 h-9 rounded-md text-light-textSecondary dark:text-dark-textSecondary hover:bg-light-secondary dark:hover:bg-dark-secondary transition-colors"
               aria-label={`알림 ${unreadCount}건`}
               aria-expanded={notificationOpen}
