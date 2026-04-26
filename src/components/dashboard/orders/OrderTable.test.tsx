@@ -20,6 +20,61 @@ beforeEach(() => {
   });
 });
 
+describe('dashboard variant server pagination', () => {
+  test('uses server total/page and delegates page changes', () => {
+    const handlePageChange = jest.fn();
+
+    render(
+      <OrderTable
+        orders={MOCK_ORDERS}
+        pagination={{
+          total: 12,
+          page:  2,
+          limit: 5,
+          onPageChange: handlePageChange,
+        }}
+      />
+    );
+
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getByText('2 / 3')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('PREVIOUS'));
+    expect(handlePageChange).toHaveBeenCalledWith(1);
+
+    fireEvent.click(screen.getByText('NEXT PAGE'));
+    expect(handlePageChange).toHaveBeenCalledWith(3);
+  });
+});
+
+describe('orders variant server pagination', () => {
+  test('uses server total/page and delegates page changes', () => {
+    const handlePageChange = jest.fn();
+
+    render(
+      <OrderTable
+        orders={MOCK_ORDERS}
+        variant="orders"
+        pagination={{
+          total: 42,
+          page:  2,
+          limit: 20,
+          onPageChange: handlePageChange,
+        }}
+      />
+    );
+
+    expect(screen.getByText('42')).toBeInTheDocument();
+    expect(screen.getByText('2 / 3')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('PREVIOUS'));
+    expect(handlePageChange).toHaveBeenCalledWith(1);
+
+    fireEvent.click(screen.getByText('NEXT PAGE'));
+    expect(handlePageChange).toHaveBeenCalledWith(3);
+  });
+});
+
 // ── useOrderFilter 모킹 ───────────────────────────────────────────────────────
 // useSearchParams(next/navigation)를 내부에서 사용하므로 훅 전체를 모킹
 
@@ -450,5 +505,24 @@ describe('상태 필터', () => {
     fireEvent.change(select, { target: { value: 'order_confirmed' } });
 
     expect(mockHandleOrderStatus).toHaveBeenCalledWith('order_confirmed');
+  });
+});
+
+describe('orders variant API 결과 표시', () => {
+  test('orders variant에서는 내부 검색 필터를 다시 적용하지 않는다', () => {
+    mockFilterReturn({
+      filter: {
+        search: '없는 주문',
+        orderStatus: 'all',
+        paymentStatus: 'all',
+        shippingStatus: 'all',
+        paymentMethod: 'all',
+      },
+    });
+
+    render(<OrderTable orders={MOCK_ORDERS} variant="orders" />);
+
+    expect(screen.getAllByText('ORD-20260001').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('ORD-20260002').length).toBeGreaterThan(0);
   });
 });

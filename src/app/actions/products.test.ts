@@ -1,30 +1,69 @@
 /**
  * saveProductAction 서버 액션 유닛 테스트
  *
- * 주의: saveProductAction은 next/cache(revalidatePath) 및
- * 모듈 레벨 MOCK 데이터를 직접 변이(mutate)하므로
- * 각 테스트 전에 jest.isolateModules 또는 beforeEach 재설정이 필요합니다.
+ * Supabase admin 클라이언트를 모킹하여 실제 DB 호출 없이 검증합니다.
  */
 
-// ── next/cache 모킹 ───────────────────────────────────────────────────────────
-jest.mock('next/cache', () => ({
-  revalidatePath: jest.fn(),
-}));
+jest.mock('next/cache', () => ({ revalidatePath: jest.fn() }))
+jest.mock('next/headers', () => ({}), { virtual: true })
+jest.mock('@/lib/supabase/admin', () => ({ getSupabaseAdmin: jest.fn() }))
 
-// ── next/server 모킹 (서버 전용 환경 변수가 없을 때 대비) ────────────────────
-jest.mock('next/headers', () => ({}), { virtual: true });
+import { revalidatePath } from 'next/cache'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
+import { saveProductAction } from './products'
+import type { ProductFormData } from '@/types/products'
 
-import { revalidatePath } from 'next/cache';
+// ── 타입 ─────────────────────────────────────────────────────────────────────
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 모듈 레벨 MOCK 데이터를 import 순서 뒤에 가져옵니다.
-// saveProductAction은 이 모듈들을 직접 변이하므로 테스트 간 격리가 필요합니다.
-// ─────────────────────────────────────────────────────────────────────────────
+type MockChain = Record<string, jest.Mock>
 
-import { saveProductAction } from './products';
-import { MOCK_PRODUCT_DETAIL_MAP } from '@/constants/productDetailMockData';
-import { MOCK_PRODUCTS } from '@/constants/productsMockData';
-import type { ProductFormData } from '@/types/products';
+// ── Supabase mock 팩토리 ──────────────────────────────────────────────────────
+
+const MOCK_NEW_ROW = {
+  id:                'prod-supabase-1',
+  product_code:      'TEST-001',
+  name:              '테스트 상품',
+  price:             50000,
+  summary:           '요약 설명',
+  short_description: '간단 설명',
+  description:       '<p>상세 설명</p>',
+  status:            'active',
+  created_at:        '2024-01-15T00:00:00.000Z',
+  updated_at:        '2024-01-15T00:00:00.000Z',
+}
+
+function makeProductsInsertChain(rowOverrides: Partial<typeof MOCK_NEW_ROW> = {}, error: unknown = null): MockChain {
+  const single = jest.fn().mockResolvedValue({ data: error ? null : { ...MOCK_NEW_ROW, ...rowOverrides }, error })
+  const select = jest.fn().mockReturnValue({ single })
+  return { insert: jest.fn().mockReturnValue({ select }), single, select }
+}
+
+function makeProductsUpdateChain(error: unknown = null): MockChain {
+  return { update: jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ error }) }) }
+}
+
+function makeSupabaseMock({
+  insertError = null as unknown,
+  updateError = null as unknown,
+  rowOverrides = {} as Partial<typeof MOCK_NEW_ROW>,
+} = {}) {
+  const productsInsert = makeProductsInsertChain(rowOverrides, insertError)
+  const productsUpdate = makeProductsUpdateChain(updateError)
+
+  const stocksChain  = { upsert: jest.fn().mockResolvedValue({ error: null }) }
+  const historyChain = { insert: jest.fn().mockResolvedValue({ error: null }) }
+
+  const mockFrom = jest.fn().mockImplementation((table: string) => {
+    if (table === 'products') return { ...productsInsert, ...productsUpdate }
+    if (table === 'stocks') return stocksChain
+    if (table === 'stock_histories') return historyChain
+    return {}
+  })
+
+  ;(getSupabaseAdmin as jest.Mock).mockReturnValue({ from: mockFrom })
+
+  return { mockFrom, stocksChain, historyChain }
+}
 
 // ── 공통 폼 데이터 팩토리 ─────────────────────────────────────────────────────
 
@@ -38,254 +77,225 @@ function makeFormData(overrides: Partial<ProductFormData> = {}): ProductFormData
     description:      '<p>상세 설명</p>',
     status:           'active',
     ...overrides,
-  };
+  }
 }
 
-// ── MOCK 데이터 초기 상태 스냅샷 ─────────────────────────────────────────────
-
-// 각 테스트 후 변이된 MOCK 데이터를 복원합니다.
-let initialMapSnapshot: Map<string, import('@/types/products').ProductDetail>;
-let initialProductsLength: number;
-let initialProductsSnapshot: import('@/types/products').ProductListItem[];
-
 beforeEach(() => {
-  (revalidatePath as jest.Mock).mockClear();
-  // MOCK_PRODUCT_DETAIL_MAP 스냅샷 저장
-  initialMapSnapshot = new Map(MOCK_PRODUCT_DETAIL_MAP);
-  // MOCK_PRODUCTS 스냅샷 저장
-  initialProductsLength = MOCK_PRODUCTS.length;
-  initialProductsSnapshot = [...MOCK_PRODUCTS];
-});
-
-afterEach(() => {
-  // MOCK_PRODUCT_DETAIL_MAP 복원
-  MOCK_PRODUCT_DETAIL_MAP.clear();
-  initialMapSnapshot.forEach((v, k) => MOCK_PRODUCT_DETAIL_MAP.set(k, v));
-
-  // MOCK_PRODUCTS 복원
-  MOCK_PRODUCTS.length = 0;
-  initialProductsSnapshot.forEach((p) => MOCK_PRODUCTS.push(p));
-});
+  jest.clearAllMocks()
+})
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('saveProductAction - 신규 생성', () => {
-  test('새 상품 ID를 반환한다', async () => {
-    const result = await saveProductAction(makeFormData());
-    expect(result.id).toMatch(/^prod-\d+$/);
-  });
+describe('saveProductAction — 신규 생성', () => {
+  test('id 필드를 반환한다', async () => {
+    makeSupabaseMock()
+    const result = await saveProductAction(makeFormData())
+    expect(typeof result.id).toBe('string')
+    expect(result.id.length).toBeGreaterThan(0)
+  })
 
-  test('반환된 product 객체가 폼 데이터와 일치한다', async () => {
-    const data = makeFormData({ name: '신규 상품', price: 99000 });
-    const result = await saveProductAction(data);
+  test('product 객체가 반환된다', async () => {
+    makeSupabaseMock()
+    const result = await saveProductAction(makeFormData())
+    expect(result.product).toBeDefined()
+  })
 
-    expect(result.product).toBeDefined();
-    expect(result.product!.name).toBe('신규 상품');
-    expect(result.product!.price).toBe(99000);
-    expect(result.product!.productCode).toBe('TEST-001');
-    expect(result.product!.status).toBe('active');
-  });
+  test('반환된 product 의 name, price, status 가 폼 데이터와 일치한다', async () => {
+    makeSupabaseMock({ rowOverrides: { name: '신규 상품', price: 99000, status: 'active' } })
+    const result = await saveProductAction(makeFormData({ name: '신규 상품', price: 99000 }))
+    expect(result.product!.name).toBe('신규 상품')
+    expect(result.product!.price).toBe(99000)
+    expect(result.product!.status).toBe('active')
+  })
 
-  test('MOCK_PRODUCT_DETAIL_MAP에 새 상품이 추가된다', async () => {
-    const data = makeFormData();
-    const { id } = await saveProductAction(data);
+  test('반환된 product 의 productCode 가 Supabase 반환값을 따른다', async () => {
+    makeSupabaseMock({ rowOverrides: { product_code: 'TEST-001' } })
+    const result = await saveProductAction(makeFormData())
+    expect(result.product!.productCode).toBe('TEST-001')
+  })
 
-    expect(MOCK_PRODUCT_DETAIL_MAP.has(id)).toBe(true);
-    const saved = MOCK_PRODUCT_DETAIL_MAP.get(id)!;
-    expect(saved.name).toBe(data.name);
-    expect(saved.productCode).toBe(data.productCode);
-  });
+  test('initialStock 미전달 시 stock 은 { total: 0, sold: 0, available: 0 }', async () => {
+    makeSupabaseMock()
+    const { product } = await saveProductAction(makeFormData())
+    expect(product!.stock).toEqual({ total: 0, sold: 0, available: 0 })
+  })
 
-  test('MOCK_PRODUCTS 목록 맨 앞에 새 아이템이 추가된다', async () => {
-    const prevLength = MOCK_PRODUCTS.length;
-    const data = makeFormData({ name: '목록 추가 테스트' });
-    await saveProductAction(data);
+  test('initialStock 전달 시 stock 에 반영된다', async () => {
+    makeSupabaseMock()
+    const initialStock = { total: 100, sold: 0, available: 100 }
+    const { product } = await saveProductAction(makeFormData(), undefined, initialStock)
+    expect(product!.stock).toEqual(initialStock)
+  })
 
-    expect(MOCK_PRODUCTS.length).toBe(prevLength + 1);
-    expect(MOCK_PRODUCTS[0].name).toBe('목록 추가 테스트');
-  });
+  test('price 가 빈 문자열이면 0으로 저장된다', async () => {
+    makeSupabaseMock({ rowOverrides: { price: 0 } })
+    const { product } = await saveProductAction(makeFormData({ price: '' }))
+    expect(product!.price).toBe(0)
+  })
 
-  test('신규 생성 시 카테고리는 "미분류"로 설정된다', async () => {
-    const { product } = await saveProductAction(makeFormData());
-    expect(product!.category).toBe('미분류');
-  });
+  test('price 가 0 이면 0으로 저장된다', async () => {
+    makeSupabaseMock({ rowOverrides: { price: 0 } })
+    const { product } = await saveProductAction(makeFormData({ price: 0 }))
+    expect(product!.price).toBe(0)
+  })
 
-  test('신규 생성 시 createdBy는 "관리자"로 설정된다', async () => {
-    const { product } = await saveProductAction(makeFormData());
-    expect(product!.createdBy).toBe('관리자');
-  });
+  test('images 는 빈 배열로 초기화된다', async () => {
+    makeSupabaseMock()
+    const { product } = await saveProductAction(makeFormData())
+    expect(product!.images).toEqual([])
+  })
 
-  test('price가 빈 문자열이면 price는 0으로 저장된다', async () => {
-    const data = makeFormData({ price: '' });
-    const { product } = await saveProductAction(data);
-    expect(product!.price).toBe(0);
-  });
+  test('createdAt, updatedAt 이 ISO 형식 문자열이다', async () => {
+    makeSupabaseMock()
+    const { product } = await saveProductAction(makeFormData())
+    expect(() => new Date(product!.createdAt)).not.toThrow()
+    expect(() => new Date(product!.updatedAt)).not.toThrow()
+    expect(product!.createdAt).toBe(new Date(product!.createdAt).toISOString())
+  })
 
-  test('initialStock이 전달되면 stock에 반영된다', async () => {
-    const initialStock = { total: 100, sold: 0, available: 100 };
-    const { product } = await saveProductAction(makeFormData(), undefined, initialStock);
-    expect(product!.stock).toEqual(initialStock);
-  });
+  test('status 가 hidden 으로 설정된 경우 product.status 도 hidden 이다', async () => {
+    makeSupabaseMock({ rowOverrides: { status: 'hidden' } })
+    const { product } = await saveProductAction(makeFormData({ status: 'hidden' }))
+    expect(product!.status).toBe('hidden')
+  })
 
-  test('initialStock 미전달 시 stock은 { total: 0, sold: 0, available: 0 }', async () => {
-    const { product } = await saveProductAction(makeFormData());
-    expect(product!.stock).toEqual({ total: 0, sold: 0, available: 0 });
-  });
+  test('status 가 sold_out 으로 설정된 경우 product.status 도 sold_out 이다', async () => {
+    makeSupabaseMock({ rowOverrides: { status: 'sold_out' } })
+    const { product } = await saveProductAction(makeFormData({ status: 'sold_out' }))
+    expect(product!.status).toBe('sold_out')
+  })
 
-  test('신규 생성 시 /dashboard/products 경로를 revalidate한다', async () => {
-    await saveProductAction(makeFormData());
-    expect(revalidatePath).toHaveBeenCalledWith('/dashboard/products');
-  });
+  test('/dashboard/products 경로를 revalidate 한다', async () => {
+    makeSupabaseMock()
+    await saveProductAction(makeFormData())
+    expect(revalidatePath).toHaveBeenCalledWith('/dashboard/products')
+  })
 
-  test('신규 생성 시 /dashboard/products/:id 경로는 revalidate하지 않는다', async () => {
-    await saveProductAction(makeFormData());
-    const calls = (revalidatePath as jest.Mock).mock.calls.map(([path]: [string]) => path);
-    expect(calls.every((p) => !p.includes('/prod-'))).toBe(true);
-  });
+  test('신규 생성 시 특정 상품 경로는 revalidate 하지 않는다', async () => {
+    makeSupabaseMock()
+    await saveProductAction(makeFormData())
+    const calls = (revalidatePath as jest.Mock).mock.calls.map(([p]: [string]) => p)
+    expect(calls.every((p) => !p.includes('/prod-'))).toBe(true)
+  })
 
-  test('이미지는 빈 배열로 초기화된다', async () => {
-    const { product } = await saveProductAction(makeFormData());
-    expect(product!.images).toEqual([]);
-  });
+  test('Supabase insert 오류 시 에러를 throw 한다', async () => {
+    makeSupabaseMock({ insertError: { message: 'db error', code: '500' } })
+    await expect(saveProductAction(makeFormData())).rejects.toThrow('상품 등록에 실패했습니다.')
+  })
 
-  test('createdAt, updatedAt이 ISO 문자열이다', async () => {
-    const { product } = await saveProductAction(makeFormData());
-    expect(new Date(product!.createdAt).toISOString()).toBe(product!.createdAt);
-    expect(new Date(product!.updatedAt).toISOString()).toBe(product!.updatedAt);
-  });
+  test('from("products") 호출 시 insert 에 올바른 필드를 전달한다', async () => {
+    const { mockFrom } = makeSupabaseMock()
+    const data = makeFormData({ name: '필드 검사', price: 12000 })
+    await saveProductAction(data)
 
-  test('상태가 hidden으로 설정되면 저장된 상품도 hidden이다', async () => {
-    const data = makeFormData({ status: 'hidden' });
-    const { product } = await saveProductAction(data);
-    expect(product!.status).toBe('hidden');
-  });
+    const productsChain = mockFrom.mock.results[0].value as MockChain
+    expect(productsChain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ name: '필드 검사', price: 12000 })
+    )
+  })
 
-  test('상태가 sold_out으로 설정되면 저장된 상품도 sold_out이다', async () => {
-    const data = makeFormData({ status: 'sold_out' });
-    const { product } = await saveProductAction(data);
-    expect(product!.status).toBe('sold_out');
-  });
-});
+  test('from("stocks") 를 호출해 재고 레코드를 생성한다', async () => {
+    const { stocksChain } = makeSupabaseMock()
+    await saveProductAction(makeFormData())
+    expect(stocksChain.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ product_id: MOCK_NEW_ROW.id }),
+      expect.anything()
+    )
+  })
 
-// ─────────────────────────────────────────────────────────────────────────────
+  test('initialStock.total > 0 이면 stock_histories insert 를 호출한다', async () => {
+    const { historyChain } = makeSupabaseMock()
+    await saveProductAction(makeFormData(), undefined, { total: 50, sold: 0, available: 50 })
+    expect(historyChain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'in', quantity: 50 })
+    )
+  })
 
-describe('saveProductAction - 기존 상품 수정', () => {
-  const EXISTING_ID = 'prod-001';
-
-  test('수정된 상품 ID를 반환한다', async () => {
-    const result = await saveProductAction(makeFormData(), EXISTING_ID);
-    expect(result.id).toBe(EXISTING_ID);
-  });
-
-  test('수정된 product 객체가 반환된다', async () => {
-    const data = makeFormData({ name: '수정된 상품명', price: 200000 });
-    const { product } = await saveProductAction(data, EXISTING_ID);
-    expect(product).toBeDefined();
-    expect(product!.name).toBe('수정된 상품명');
-    expect(product!.price).toBe(200000);
-  });
-
-  test('MOCK_PRODUCT_DETAIL_MAP의 해당 상품이 갱신된다', async () => {
-    const data = makeFormData({ name: '맵 갱신 테스트', productCode: 'NEW-CODE' });
-    await saveProductAction(data, EXISTING_ID);
-
-    const updated = MOCK_PRODUCT_DETAIL_MAP.get(EXISTING_ID)!;
-    expect(updated.name).toBe('맵 갱신 테스트');
-    expect(updated.productCode).toBe('NEW-CODE');
-  });
-
-  test('수정 시 price가 빈 문자열이면 기존 가격이 유지된다', async () => {
-    const existing = MOCK_PRODUCT_DETAIL_MAP.get(EXISTING_ID)!;
-    const originalPrice = existing.price;
-
-    const data = makeFormData({ price: '' });
-    const { product } = await saveProductAction(data, EXISTING_ID);
-    expect(product!.price).toBe(originalPrice);
-  });
-
-  test('수정 시 updatedAt이 갱신된다', async () => {
-    const existing = MOCK_PRODUCT_DETAIL_MAP.get(EXISTING_ID)!;
-    const originalUpdatedAt = existing.updatedAt;
-
-    // 1ms 이상 지나게 하기 위해 잠깐 대기
-    await new Promise((r) => setTimeout(r, 5));
-
-    await saveProductAction(makeFormData(), EXISTING_ID);
-
-    const updated = MOCK_PRODUCT_DETAIL_MAP.get(EXISTING_ID)!;
-    expect(updated.updatedAt).not.toBe(originalUpdatedAt);
-  });
-
-  test('수정 시 기존 stock, images, createdAt, createdBy는 유지된다', async () => {
-    const existing = MOCK_PRODUCT_DETAIL_MAP.get(EXISTING_ID)!;
-    const { product } = await saveProductAction(makeFormData(), EXISTING_ID);
-
-    expect(product!.stock).toEqual(existing.stock);
-    expect(product!.images).toEqual(existing.images);
-    expect(product!.createdAt).toBe(existing.createdAt);
-    expect(product!.createdBy).toBe(existing.createdBy);
-  });
-
-  test('MOCK_PRODUCTS 목록의 해당 항목도 동기화된다', async () => {
-    const data = makeFormData({ name: '목록 동기화 테스트', status: 'hidden' });
-    await saveProductAction(data, EXISTING_ID);
-
-    const listItem = MOCK_PRODUCTS.find((p) => p.id === EXISTING_ID);
-    expect(listItem).toBeDefined();
-    expect(listItem!.name).toBe('목록 동기화 테스트');
-    expect(listItem!.status).toBe('hidden');
-  });
-
-  test('수정 시 /dashboard/products/:id 경로를 revalidate한다', async () => {
-    await saveProductAction(makeFormData(), EXISTING_ID);
-    expect(revalidatePath).toHaveBeenCalledWith(`/dashboard/products/${EXISTING_ID}`);
-  });
-
-  test('수정 시 /dashboard/products 경로도 revalidate한다', async () => {
-    await saveProductAction(makeFormData(), EXISTING_ID);
-    expect(revalidatePath).toHaveBeenCalledWith('/dashboard/products');
-  });
-
-  test('존재하지 않는 ID로 수정 시 에러가 발생한다', async () => {
-    await expect(saveProductAction(makeFormData(), 'non-existent-id')).rejects.toThrow(
-      '상품을 찾을 수 없습니다.',
-    );
-  });
-
-  test('수정 시 summary, shortDescription, description이 업데이트된다', async () => {
-    const data = makeFormData({
-      summary:          '수정된 요약',
-      shortDescription: '수정된 간단 설명',
-      description:      '<p>수정된 상세</p>',
-    });
-    const { product } = await saveProductAction(data, EXISTING_ID);
-    expect(product!.summary).toBe('수정된 요약');
-    expect(product!.shortDescription).toBe('수정된 간단 설명');
-    expect(product!.description).toBe('<p>수정된 상세</p>');
-  });
-});
+  test('initialStock.total === 0 이면 stock_histories insert 를 호출하지 않는다', async () => {
+    const { historyChain } = makeSupabaseMock()
+    await saveProductAction(makeFormData(), undefined, { total: 0, sold: 0, available: 0 })
+    expect(historyChain.insert).not.toHaveBeenCalled()
+  })
+})
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('saveProductAction - 경계값 및 추가 케이스', () => {
-  test('목록에 없는 상품 ID를 수정하려 하면 에러 발생', async () => {
-    await expect(saveProductAction(makeFormData(), 'prod-999-ghost')).rejects.toThrow();
-  });
+describe('saveProductAction — 기존 상품 수정', () => {
+  const EXISTING_ID = 'prod-001'
 
-  test('price가 0이면 0으로 저장된다', async () => {
-    const data = makeFormData({ price: 0 });
-    const { product } = await saveProductAction(data);
-    expect(product!.price).toBe(0);
-  });
+  test('수정된 상품 id 를 반환한다', async () => {
+    makeSupabaseMock()
+    const result = await saveProductAction(makeFormData(), EXISTING_ID)
+    expect(result.id).toBe(EXISTING_ID)
+  })
 
-  test('연속으로 신규 생성 시 서로 다른 ID가 발급된다', async () => {
-    // Date.now() 기반이므로 타임스탬프가 같을 수 있어 약간의 딜레이
-    const [r1, r2] = await Promise.all([
-      saveProductAction(makeFormData({ productCode: 'CODE-A' })),
-      saveProductAction(makeFormData({ productCode: 'CODE-B' })),
-    ]);
-    // 병렬 실행 시에도 각각 Map에 추가됨을 확인
-    expect(MOCK_PRODUCT_DETAIL_MAP.has(r1.id)).toBe(true);
-    expect(MOCK_PRODUCT_DETAIL_MAP.has(r2.id)).toBe(true);
-  });
-});
+  test('수정 시 product 필드는 반환하지 않는다', async () => {
+    makeSupabaseMock()
+    const result = await saveProductAction(makeFormData(), EXISTING_ID)
+    expect(result.product).toBeUndefined()
+  })
+
+  test('/dashboard/products/:id 경로를 revalidate 한다', async () => {
+    makeSupabaseMock()
+    await saveProductAction(makeFormData(), EXISTING_ID)
+    expect(revalidatePath).toHaveBeenCalledWith(`/dashboard/products/${EXISTING_ID}`)
+  })
+
+  test('/dashboard/products 경로도 revalidate 한다', async () => {
+    makeSupabaseMock()
+    await saveProductAction(makeFormData(), EXISTING_ID)
+    expect(revalidatePath).toHaveBeenCalledWith('/dashboard/products')
+  })
+
+  test('price 가 빈 문자열이면 update body 에 price 를 포함하지 않는다', async () => {
+    const { mockFrom } = makeSupabaseMock()
+    await saveProductAction(makeFormData({ price: '' }), EXISTING_ID)
+    const productsChain = mockFrom.mock.results[0].value as MockChain
+    const updateArg = productsChain.update.mock.calls[0][0] as Record<string, unknown>
+    expect(updateArg).not.toHaveProperty('price')
+  })
+
+  test('price 가 숫자이면 update body 에 price 가 포함된다', async () => {
+    const { mockFrom } = makeSupabaseMock()
+    await saveProductAction(makeFormData({ price: 99000 }), EXISTING_ID)
+    const productsChain = mockFrom.mock.results[0].value as MockChain
+    const updateArg = productsChain.update.mock.calls[0][0] as Record<string, unknown>
+    expect(updateArg).toHaveProperty('price', 99000)
+  })
+
+  test('Supabase update 오류 시 에러를 throw 한다', async () => {
+    makeSupabaseMock({ updateError: { message: 'db error', code: '500' } })
+    await expect(saveProductAction(makeFormData(), EXISTING_ID)).rejects.toThrow('상품 수정에 실패했습니다.')
+  })
+
+  test('수정 시 summary, shortDescription, description 이 update body 에 포함된다', async () => {
+    const { mockFrom } = makeSupabaseMock()
+    await saveProductAction(
+      makeFormData({ summary: '수정 요약', shortDescription: '수정 간단', description: '<p>수정</p>' }),
+      EXISTING_ID
+    )
+    const productsChain = mockFrom.mock.results[0].value as MockChain
+    const updateArg = productsChain.update.mock.calls[0][0] as Record<string, unknown>
+    expect(updateArg).toMatchObject({
+      summary:           '수정 요약',
+      short_description: '수정 간단',
+      description:       '<p>수정</p>',
+    })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('saveProductAction — getSupabaseAdmin 호출 검증', () => {
+  test('신규 생성 시 getSupabaseAdmin 을 1회 호출한다', async () => {
+    makeSupabaseMock()
+    await saveProductAction(makeFormData())
+    expect(getSupabaseAdmin).toHaveBeenCalledTimes(1)
+  })
+
+  test('수정 시 getSupabaseAdmin 을 1회 호출한다', async () => {
+    makeSupabaseMock()
+    await saveProductAction(makeFormData(), 'prod-001')
+    expect(getSupabaseAdmin).toHaveBeenCalledTimes(1)
+  })
+})

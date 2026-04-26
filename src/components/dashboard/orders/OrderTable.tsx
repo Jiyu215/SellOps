@@ -39,6 +39,13 @@ import {
   formatOrderDate,
 } from '@/constants/orderConstants';
 
+interface OrderTablePagination {
+  total: number;
+  page: number;
+  limit: number;
+  onPageChange: (page: number) => void;
+}
+
 interface OrderTableProps {
   orders: Order[];
   /**
@@ -49,6 +56,7 @@ interface OrderTableProps {
   variant?:       'dashboard' | 'orders';
   /** orders variant 전용: 상태 변경 시 호출 */
   onOrderUpdate?: (id: string, partial: Partial<Pick<Order, 'orderStatus' | 'paymentStatus' | 'shippingStatus'>>) => void;
+  pagination?:    OrderTablePagination;
 }
 
 /**
@@ -183,7 +191,12 @@ const FilterSelect = ({
  * - 최신 주문순(createdAt desc) 정렬
  * - 행·카드 클릭 → /dashboard/orders/:id
  */
-export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: OrderTableProps) => {
+export const OrderTable = ({
+  orders,
+  variant = 'dashboard',
+  onOrderUpdate,
+  pagination,
+}: OrderTableProps) => {
   const {
     filter,
     currentPage,
@@ -199,6 +212,7 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
   } = useOrderFilter();
 
   const isOrdersVariant = variant === 'orders';
+  const hasServerPagination = Boolean(pagination);
   const TABLE_COLS = isOrdersVariant ? ORDERS_TABLE_COLS : DASHBOARD_TABLE_COLS;
 
   // ── 반응형 페이지 크기 ────────────────────────────────────────────────────
@@ -223,6 +237,9 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
   );
 
   const filteredOrders = useMemo(() => {
+    if (hasServerPagination) return orders;
+    if (isOrdersVariant) return orders;
+
     const q = filter.search.trim().toLowerCase();
     return sortedOrders.filter((order) => {
       const matchesSearch =
@@ -237,16 +254,36 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
 
       return matchesSearch && matchesOrderStatus && matchesPaymentStatus && matchesShipping;
     });
-  }, [sortedOrders, filter]);
+  }, [hasServerPagination, isOrdersVariant, orders, sortedOrders, filter]);
 
   // ── 페이지네이션 ──────────────────────────────────────────────────────────
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
-  const safePage   = Math.min(currentPage, totalPages);
+  const totalRecords = pagination?.total ?? filteredOrders.length;
+  const effectivePageSize = pagination?.limit ?? pageSize;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / effectivePageSize));
+  const safePage   = Math.min(pagination?.page ?? currentPage, totalPages);
 
-  const paginatedOrders = filteredOrders.slice(
-    (safePage - 1) * pageSize,
-    safePage * pageSize,
-  );
+  const paginatedOrders = hasServerPagination
+    ? filteredOrders
+    : filteredOrders.slice(
+      (safePage - 1) * pageSize,
+      safePage * pageSize,
+    );
+
+  const handlePrevPage = () => {
+    if (pagination) {
+      pagination.onPageChange(Math.max(1, safePage - 1));
+      return;
+    }
+    setCurrentPage((p) => p - 1);
+  };
+
+  const handleNextPage = () => {
+    if (pagination) {
+      pagination.onPageChange(Math.min(totalPages, safePage + 1));
+      return;
+    }
+    setCurrentPage((p) => p + 1);
+  };
 
   // ── 렌더 ─────────────────────────────────────────────────────────────────
   return (
@@ -550,7 +587,7 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
           SHOWING{' '}
           <span className="font-semibold text-light-textPrimary dark:text-dark-textPrimary">{paginatedOrders.length}</span>
           {' '}OF{' '}
-          <span className="font-semibold text-light-textPrimary dark:text-dark-textPrimary">{filteredOrders.length.toLocaleString()}</span>
+          <span className="font-semibold text-light-textPrimary dark:text-dark-textPrimary">{totalRecords.toLocaleString()}</span>
           {' '}RECORDS
         </p>
 
@@ -558,7 +595,7 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
           <button
             type="button"
             disabled={safePage <= 1}
-            onClick={() => setCurrentPage((p) => p - 1)}
+            onClick={handlePrevPage}
             className="inline-flex items-center gap-xs text-caption font-semibold px-sm py-xs rounded-md border border-light-border dark:border-dark-border text-light-textSecondary dark:text-dark-textSecondary hover:bg-light-secondary dark:hover:bg-dark-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             aria-label="이전 페이지"
           >
@@ -573,7 +610,7 @@ export const OrderTable = ({ orders, variant = 'dashboard', onOrderUpdate }: Ord
           <button
             type="button"
             disabled={safePage >= totalPages}
-            onClick={() => setCurrentPage((p) => p + 1)}
+            onClick={handleNextPage}
             className="inline-flex items-center gap-xs text-caption font-semibold px-sm py-xs rounded-md border border-light-border dark:border-dark-border text-light-textSecondary dark:text-dark-textSecondary hover:bg-light-secondary dark:hover:bg-dark-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             aria-label="다음 페이지"
           >

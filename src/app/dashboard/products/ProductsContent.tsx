@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { ProductTable } from '@/components/dashboard/products';
-import { MOCK_PRODUCTS } from '@/constants/productsMockData';
 import type { ProductListItem, ProductStatus } from '@/types/products';
 
 interface ProductsContentProps {
@@ -10,24 +10,24 @@ interface ProductsContentProps {
   initialProducts?: ProductListItem[];
 }
 
-/**
- * 상품 관리 페이지 콘텐츠 (Client Component)
- *
- * useSearchParams(useProductFilter 내부)를 사용하므로 Suspense 바운더리 필요.
- * 실제 서비스에서는 서버 액션 또는 React Query로 데이터를 패칭한다.
- *
- * initialProducts: ProductsPage (Server Component)가 서버 측 최신 목록을 주입.
- * 이를 통해 saveProductAction 후 revalidatePath 로 갱신된 목록이 즉시 반영된다.
- */
 export const ProductsContent = ({ initialProducts }: ProductsContentProps) => {
+  const router = useRouter();
   const [products, setProducts] = useState<ProductListItem[]>(
-    () => initialProducts ?? [...MOCK_PRODUCTS],
+    () => initialProducts ?? [],
   );
   const [exportLoading, setExportLoading] = useState(false);
 
   const handleBulkStatusChange = useCallback(
     async (ids: string[], status: ProductStatus) => {
-      // 실제 서비스: await apiClient.patch('/products/bulk-status', { ids, status })
+      const res = await fetch('/api/products/bulk-status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, status }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? '상태 변경에 실패했습니다.');
+      }
       setProducts((prev) =>
         prev.map((p) => (ids.includes(p.id) ? { ...p, status } : p)),
       );
@@ -37,18 +37,32 @@ export const ProductsContent = ({ initialProducts }: ProductsContentProps) => {
 
   const handleBulkDelete = useCallback(
     async (ids: string[]) => {
-      // 실제 서비스: await apiClient.delete('/products/bulk', { ids })
+      const res = await fetch('/api/products/bulk-delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? '삭제에 실패했습니다.');
+      }
       setProducts((prev) => prev.filter((p) => !ids.includes(p.id)));
+      router.refresh();
     },
-    [],
+    [router],
   );
 
   const handleSingleDelete = useCallback(
     async (id: string) => {
-      // 실제 서비스: await apiClient.delete(`/products/${id}`)
+      const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? '삭제에 실패했습니다.');
+      }
       setProducts((prev) => prev.filter((p) => p.id !== id));
+      router.refresh();
     },
-    [],
+    [router],
   );
 
   return (

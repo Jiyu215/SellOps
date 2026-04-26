@@ -12,7 +12,6 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
-import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
@@ -39,6 +38,7 @@ import type {
   ProductImage,
   ProductStatus,
   StockHistory,
+  ProductCategoryOption,
   ProductFormData,
   ProductFormErrors,
   CodeCheckState,
@@ -75,7 +75,70 @@ const STATUS_DESCRIPTIONS: Record<ProductStatus, string> = {
   sold_out: '고객 노출, 구매 불가',
 };
 
-// ── 임시저장 키 생성 ──────────────────────────────────────────────────────────
+/**
+ * Uploads a product image file to the server and returns the created image's metadata.
+ *
+ * @param productId - The product's identifier to associate the uploaded image with
+ * @param file - The image File to upload
+ * @param type - The image type (e.g., `main`, `list`, `small`, `thumbnail`, `extra`)
+ * @param order - Optional order index for `extra` images
+ * @returns The created image record containing `id`, `type`, `url`, `fileName`, `fileSize` (in bytes), optional `order`, and `createdAt`
+ *
+ * @throws Error if the API responds with a non-OK status; the error message contains the server-provided message when available or a fallback message
+ */
+
+async function uploadImageViaApi(
+  productId: string,
+  file: File,
+  type: ImageType,
+  order?: number,
+): Promise<ProductImage> {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('type', type);
+  if (order !== undefined) form.append('order', String(order));
+
+  const res = await fetch(`/api/products/${productId}/images`, { method: 'POST', body: form });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(body.error ?? '이미지 업로드에 실패했습니다. 다시 시도해주세요.');
+  }
+  const data = await res.json() as {
+    id: string; type: string; url: string; order?: number;
+    file_name?: string; size_mb?: number; created_at?: string;
+  };
+  return {
+    id:        data.id,
+    type:      data.type as ImageType,
+    url:       data.url,
+    fileName:  data.file_name ?? file.name,
+    fileSize:  Math.round((data.size_mb ?? 0) * 1024 * 1024) || file.size,
+    order:     data.order,
+    createdAt: data.created_at ?? new Date().toISOString(),
+  };
+}
+
+/**
+ * Deletes an image belonging to a product on the server.
+ *
+ * @param productId - ID of the product that owns the image
+ * @param imageId - ID of the image to delete
+ * @throws Error when the server responds with an error or deletion fails
+ */
+async function deleteImageViaApi(productId: string, imageId: string): Promise<void> {
+  const res = await fetch(`/api/products/${productId}/images/${imageId}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(body.error ?? '이미지 삭제에 실패했습니다.');
+  }
+}
+
+/**
+ * Builds the localStorage key used to save or retrieve a product draft.
+ *
+ * @param productId - The product's ID, or `null` to indicate a new (unsaved) product
+ * @returns The draft storage key string in the form `sellops_product_draft_user_{id|new}`
+ */
 
 function getDraftKey(productId: string | null): string {
   return `sellops_product_draft_user_${productId ?? 'new'}`;
@@ -86,15 +149,22 @@ function getDraftKey(productId: string | null): string {
 export interface ProductDetailFormProps {
   product?: ProductDetail;
   isNew:    boolean;
+  categoryOptions?: ProductCategoryOption[];
 }
 
-// ── 폼 초기값 ─────────────────────────────────────────────────────────────────
+/**
+ * Create initial form data for a product form, optionally seeded from an existing product.
+ *
+ * @param product - Optional product whose editable fields will be used to populate the form
+ * @returns A ProductFormData object populated from `product` when provided; otherwise an object with empty fields and `status` set to `"active"`
+ */
 
 function getInitialFormData(product?: ProductDetail): ProductFormData {
   if (!product) {
     return {
       name:             '',
       productCode:      '',
+      categoryId:       '',
       price:            '',
       summary:          '',
       shortDescription: '',
@@ -105,6 +175,7 @@ function getInitialFormData(product?: ProductDetail): ProductFormData {
   return {
     name:             product.name,
     productCode:      product.productCode,
+    categoryId:       product.categoryId ?? '',
     price:            product.price,
     summary:          product.summary,
     shortDescription: product.shortDescription,
@@ -211,13 +282,14 @@ const inputCls = (hasError: boolean) =>
 // ── 이미지 드롭존 ─────────────────────────────────────────────────────────────
 
 interface ImageDropZoneProps {
-  imageType:  Exclude<ImageType, 'extra'>;
-  image:      ProductImage | null;
+  imageType:    Exclude<ImageType, 'extra'>;
+  image:        ProductImage | null;
+  isUploading?: boolean;
   onFileSelect: (file: File, type: Exclude<ImageType, 'extra'>) => void;
-  onRemove:   (type: Exclude<ImageType, 'extra'>) => void;
+  onRemove:     (type: Exclude<ImageType, 'extra'>) => void;
 }
 
-const ImageDropZone = ({ imageType, image, onFileSelect, onRemove }: ImageDropZoneProps) => {
+const ImageDropZone = ({ imageType, image, isUploading, onFileSelect, onRemove }: ImageDropZoneProps) => {
   const config    = IMAGE_TYPE_CONFIG[imageType];
   const inputRef  = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -241,6 +313,11 @@ const ImageDropZone = ({ imageType, image, onFileSelect, onRemove }: ImageDropZo
       <span className="text-caption font-medium text-light-textSecondary dark:text-dark-textSecondary">{config.label}</span>
       {image && image.url ? (
         <div className="relative rounded-md border border-light-border dark:border-dark-border overflow-hidden group aspect-square">
+          {isUploading && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40">
+              <LoadingOutlined className="text-h3 text-white animate-spin" aria-label="업로드 중" />
+            </div>
+          )}
           <Image
             src={image.url}
             alt={config.label}
@@ -307,16 +384,17 @@ const ImageDropZone = ({ imageType, image, onFileSelect, onRemove }: ImageDropZo
 // ── 추가 이미지 카드 ──────────────────────────────────────────────────────────
 
 interface ExtraImageCardProps {
-  image:       ProductImage;
-  isDragOver:  boolean;
-  onRemove:    (id: string) => void;
-  onDragStart: (id: string) => void;
-  onDragOver:  (id: string) => void;
-  onDrop:      (id: string) => void;
+  image:        ProductImage;
+  isDragOver:   boolean;
+  isUploading?: boolean;
+  onRemove:     (id: string) => void;
+  onDragStart:  (id: string) => void;
+  onDragOver:   (id: string) => void;
+  onDrop:       (id: string) => void;
 }
 
 const ExtraImageCard = ({
-  image, isDragOver, onRemove, onDragStart, onDragOver, onDrop,
+  image, isDragOver, isUploading, onRemove, onDragStart, onDragOver, onDrop,
 }: ExtraImageCardProps) => (
   <div
     draggable
@@ -345,6 +423,12 @@ const ExtraImageCard = ({
     >
       <DeleteOutlined className="text-caption" />
     </button>
+
+    {isUploading && (
+      <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40">
+        <LoadingOutlined className="text-h3 text-white animate-spin" aria-label="업로드 중" />
+      </div>
+    )}
 
     {image.url ? (
       <Image src={image.url} alt={image.fileName} fill className="object-cover pointer-events-none" />
@@ -433,7 +517,11 @@ interface ToastState {
 
 // ── 메인 컴포넌트 ─────────────────────────────────────────────────────────────
 
-export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) => {
+export const ProductDetailForm = ({
+  product,
+  isNew,
+  categoryOptions = [],
+}: ProductDetailFormProps) => {
   const router    = useRouter();
   const uid       = useId();
   const fid       = (field: string) => `${uid}-${field}`;
@@ -449,6 +537,8 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
   // ── 저장 상태 ────────────────────────────────────────────
   const [isSaving,      setIsSaving]      = useState(false);
   const [isDraftSaving, setIsDraftSaving] = useState(false);
+  const [isDeleting,    setIsDeleting]    = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // ── 변경 감지 ────────────────────────────────────────────
   const isDirtyRef      = useRef(false);
@@ -480,6 +570,15 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
   const extraDragIdRef = useRef<string | null>(null);
   const extraFileInputRef = useRef<HTMLInputElement>(null);
 
+  // ── 신규 등록 중 미업로드 파일 보관 (productId 확정 후 일괄 업로드) ──
+  const pendingTypedFilesRef  = useRef<Partial<Record<Exclude<ImageType, 'extra'>, File>>>({});
+  const pendingExtraFilesRef  = useRef<Array<{ localId: string; file: File }>>([]);
+  // ── 수정 모드 이미지 변경 대기 (저장하기 클릭 시 일괄 적용) ──────────
+  const pendingTypedEditRef = useRef<Partial<Record<Exclude<ImageType, 'extra'>, File>>>({});
+  const pendingExtraEditRef = useRef<Array<{ localId: string; file: File }>>([]);
+  const pendingDeleteIdsRef = useRef<string[]>([]);
+  const [hasPendingImages,  setHasPendingImages] = useState(false);
+
   // ── 재고 상태 ────────────────────────────────────────────
   const [stock, setStock] = useState(product?.stock ?? { total: 0, sold: 0, available: 0 });
 
@@ -488,7 +587,13 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
   const [adjustQuantity, setAdjustQuantity] = useState('');
   const [adjustReason,   setAdjustReason]   = useState('');
   const [adjustError,    setAdjustError]    = useState('');
-  const [isAdjusting,    setIsAdjusting]    = useState(false);
+
+  // ── 저장 대기 중인 재고 조정 (기존 상품, 저장하기 클릭 시 일괄 적용) ──
+  const [pendingStockAdjustments, setPendingStockAdjustments] = useState<Array<{
+    type: StockAdjustmentType;
+    quantity: number;
+    reason: string;
+  }>>([]);
 
   // ── 재고 이력 ────────────────────────────────────────────
   const [historyOpen,    setHistoryOpen]    = useState(false);
@@ -504,6 +609,7 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
   const currentIsNew   = savedNewProduct === null && isNew;
 
   // ── 필드 ref (첫 에러 포커스용) ───────────────────────────
+  const categoryRef    = useRef<HTMLSelectElement>(null);
   const nameRef        = useRef<HTMLInputElement>(null);
   const codeRef        = useRef<HTMLInputElement>(null);
   const priceRef       = useRef<HTMLInputElement>(null);
@@ -518,17 +624,18 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
   // ── 변경 감지 ────────────────────────────────────────────
   useEffect(() => {
     const initial = initialDataRef.current;
-    const changed =
+    const formChanged =
       formData.name             !== initial.name             ||
       formData.productCode      !== initial.productCode      ||
+      formData.categoryId       !== initial.categoryId       ||
       formData.price            !== initial.price            ||
       formData.summary          !== initial.summary          ||
       formData.shortDescription !== initial.shortDescription ||
       formData.description      !== initial.description      ||
       formData.status           !== initial.status;
 
-    isDirtyRef.current = changed;
-  }, [formData]);
+    isDirtyRef.current = formChanged || pendingStockAdjustments.length > 0 || hasPendingImages;
+  }, [formData, pendingStockAdjustments, hasPendingImages]);
 
   // ── beforeunload 이탈 방지 ────────────────────────────────
   useEffect(() => {
@@ -639,6 +746,9 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
   // ── 유효성 검사 ──────────────────────────────────────────
   const validate = useCallback((): boolean => {
     const next: ProductFormErrors = {};
+    if (categoryOptions.length > 0 && !formData.categoryId) {
+      next.categoryId = '카테고리를 선택해주세요.';
+    }
 
     if (!formData.name.trim()) {
       next.name = '상품명을 입력해주세요.';
@@ -660,10 +770,11 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
 
     setErrors(next);
     return Object.keys(next).length === 0;
-  }, [formData, codeCheck, codeCheckedFor]);
+  }, [categoryOptions.length, formData, codeCheck, codeCheckedFor]);
 
   // ── 첫 에러 필드 포커스 ───────────────────────────────────
   const focusFirstError = useCallback((errs: ProductFormErrors) => {
+    if (errs.categoryId)  { categoryRef.current?.focus(); categoryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
     if (errs.name)        { nameRef.current?.focus(); nameRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
     if (errs.productCode) { codeRef.current?.focus(); codeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
     if (errs.price)       { priceRef.current?.focus(); priceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
@@ -672,6 +783,10 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
   // ── blur 단일 유효성 ─────────────────────────────────────
   const handleBlur = useCallback((field: keyof ProductFormErrors) => {
     const next: ProductFormErrors = { ...errors };
+    if (field === 'categoryId') {
+      if (categoryOptions.length > 0 && !formData.categoryId) next.categoryId = '카테고리를 선택해주세요.';
+      else delete next.categoryId;
+    }
 
     if (field === 'name') {
       if (!formData.name.trim()) next.name = '상품명을 입력해주세요.';
@@ -690,7 +805,7 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
     }
 
     setErrors(next);
-  }, [errors, formData]);
+  }, [categoryOptions.length, errors, formData]);
 
   // ── 상품코드 중복 확인 ────────────────────────────────────
   const handleCodeCheck = useCallback(async () => {
@@ -727,6 +842,7 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
     const valid = validate();
     if (!valid) {
       const errs = {} as ProductFormErrors;
+      if (categoryOptions.length > 0 && !formData.categoryId) errs.categoryId = '카테고리를 선택해주세요.';
       if (!formData.name.trim()) errs.name = '상품명을 입력해주세요.';
       if (formData.price === '' || formData.price < 0) errs.price = '올바른 금액을 입력해주세요.';
       if (!formData.productCode.trim()) errs.productCode = '상품코드를 입력해주세요.';
@@ -738,17 +854,132 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
     try {
       if (currentIsNew) {
         // 신규 등록: 서버 액션으로 저장 후 페이지 이동 없이 수정 모드로 전환
-        // 폼에서 미리 조정한 초기 재고도 함께 전달
         const { id, product: newProduct } = await saveProductAction(formData, undefined, stock);
         try { localStorage.removeItem(getDraftKey(null)); } catch { /* 무시 */ }
         isDirtyRef.current = false;
-        if (newProduct) setSavedNewProduct(newProduct);
         initialDataRef.current = { ...formData };
         window.history.replaceState(null, '', `/dashboard/products/${id}`);
+
+        // pending 이미지 일괄 업로드
+        const pendingTyped  = { ...pendingTypedFilesRef.current };
+        const pendingExtras = [...pendingExtraFilesRef.current];
+        pendingTypedFilesRef.current  = {};
+        pendingExtraFilesRef.current  = [];
+
+        const uploadResults = await Promise.allSettled([
+          ...Object.entries(pendingTyped).map(async ([type, file]) => {
+            try {
+              const uploaded = await uploadImageViaApi(id, file, type as Exclude<ImageType, 'extra'>);
+              setTypedImages((p) => ({ ...p, [type]: uploaded }));
+            } catch { /* 개별 실패는 토스트 생략, 사용자가 재업로드 가능 */ }
+          }),
+          ...pendingExtras.map(async ({ localId, file }, i) => {
+            try {
+              const uploaded = await uploadImageViaApi(id, file, 'extra', i);
+              setExtraImages((prev) => prev.map((img) => img.id === localId ? uploaded : img));
+            } catch { /* 개별 실패 */ }
+          }),
+        ]);
+
+        const anyFailed = uploadResults.some((r) => r.status === 'rejected');
+        if (anyFailed) {
+          showToast('일부 이미지 업로드에 실패했습니다. 다시 시도해주세요.', 'error');
+        }
+
+        if (newProduct) setSavedNewProduct(newProduct);
         showToast('상품이 등록되었습니다.', 'success');
       } else {
-        // 수정: 서버 액션으로 저장 후 현재 페이지 유지
+        // 수정: 서버 액션으로 저장
         await saveProductAction(formData, currentProduct!.id);
+
+        // 대기 중인 이미지 변경 일괄 처리
+        const deleteIds    = [...pendingDeleteIdsRef.current];
+        const typedUploads = { ...pendingTypedEditRef.current };
+        const extraUploads = [...pendingExtraEditRef.current];
+        pendingDeleteIdsRef.current  = [];
+        pendingTypedEditRef.current  = {};
+        pendingExtraEditRef.current  = [];
+
+        if (deleteIds.length > 0 || Object.keys(typedUploads).length > 0 || extraUploads.length > 0) {
+          // 삭제 처리
+          if (deleteIds.length > 0) {
+            await Promise.allSettled(
+              deleteIds.map((imageId) => deleteImageViaApi(currentProduct!.id, imageId)),
+            );
+          }
+
+          // 규격 이미지 업로드
+          const typedResults = await Promise.allSettled(
+            Object.entries(typedUploads).map(async ([type, file]) => {
+              const uploaded = await uploadImageViaApi(
+                currentProduct!.id, file, type as Exclude<ImageType, 'extra'>,
+              );
+              setTypedImages((p) => {
+                const prev = p[type as Exclude<ImageType, 'extra'>];
+                if (prev?.url.startsWith('blob:')) URL.revokeObjectURL(prev.url);
+                return { ...p, [type]: uploaded };
+              });
+            }),
+          );
+
+          // 추가 이미지 업로드
+          const snapshot = extraImagesRef.current;
+          const extraResults = await Promise.allSettled(
+            extraUploads.map(async ({ localId, file }) => {
+              const order = snapshot.findIndex((img) => img.id === localId);
+              const uploaded = await uploadImageViaApi(
+                currentProduct!.id, file, 'extra', order >= 0 ? order : undefined,
+              );
+              setExtraImages((prev) =>
+                prev.map((img) => {
+                  if (img.id !== localId) return img;
+                  if (img.url.startsWith('blob:')) URL.revokeObjectURL(img.url);
+                  return uploaded;
+                }),
+              );
+            }),
+          );
+
+          const anyImageFailed = [...typedResults, ...extraResults].some(
+            (r) => r.status === 'rejected',
+          );
+          if (anyImageFailed) {
+            showToast('일부 이미지 처리에 실패했습니다. 다시 저장해주세요.', 'error');
+          }
+        }
+
+        setHasPendingImages(false);
+
+        // 대기 중인 재고 조정 순서대로 API 적용
+        if (pendingStockAdjustments.length > 0) {
+          const toApply = [...pendingStockAdjustments];
+          setPendingStockAdjustments([]);
+          let latestStock = stock;
+          for (const adj of toApply) {
+            try {
+              latestStock = await adjustStock(
+                currentProduct!.id,
+                adj.type,
+                adj.quantity,
+                adj.reason || undefined,
+              );
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : '재고 조정에 실패했습니다.';
+              showToast(msg, 'error');
+              // 실패한 조정부터 다시 pending으로 복원
+              const failedIndex = toApply.indexOf(adj);
+              setPendingStockAdjustments(toApply.slice(failedIndex));
+              throw e;
+            }
+          }
+          setStock(latestStock);
+          // 재고 이력 새로고침 (이미 열려있을 경우)
+          if (historyOpen) {
+            setHistoryItems([]);
+            setHistoryOpen(false);
+          }
+        }
+
         initialDataRef.current = { ...formData };
         isDirtyRef.current = false;
         try { localStorage.removeItem(getDraftKey(currentProduct!.id)); } catch { /* 무시 */ }
@@ -759,7 +990,27 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
     } finally {
       setIsSaving(false);
     }
-  }, [validate, formData, currentIsNew, focusFirstError, currentProduct, stock, showToast, setSavedNewProduct]);
+  }, [validate, categoryOptions.length, formData, currentIsNew, focusFirstError, currentProduct, stock, showToast, setSavedNewProduct, pendingStockAdjustments, historyOpen]);
+
+  // ── 상품 삭제 ────────────────────────────────────────────
+  const handleDelete = useCallback(async () => {
+    if (!currentProduct?.id) return;
+    setIsDeleting(true);
+    setShowDeleteModal(false);
+    try {
+      const res = await fetch(`/api/products/${currentProduct.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? '상품 삭제에 실패했습니다.');
+      }
+      isDirtyRef.current = false;
+      router.push('/dashboard/products');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '상품 삭제에 실패했습니다.';
+      showToast(msg, 'error');
+      setIsDeleting(false);
+    }
+  }, [currentProduct?.id, router, showToast]);
 
   // ── 이미지 파일 검사 ──────────────────────────────────────
   const validateImageFile = useCallback((file: File): string | null => {
@@ -773,59 +1024,111 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
     const err = validateImageFile(file);
     if (err) { showToast(err, 'error'); return; }
 
-    // 기존 로컬 URL 정리
-    const prev = typedImages[imageType];
-    if (prev?.url.startsWith('blob:')) URL.revokeObjectURL(prev.url);
+    const prev    = typedImages[imageType];
+    const localId = `local-${imageType}-${Date.now()}`;
+    const url     = URL.createObjectURL(file);
 
-    const url = URL.createObjectURL(file);
-    const img: ProductImage = {
-      id:        `local-${imageType}-${Date.now()}`,
-      type:      imageType,
-      url,
-      fileName:  file.name,
-      fileSize:  file.size,
-      createdAt: new Date().toISOString(),
-    };
-    setTypedImages((prev) => ({ ...prev, [imageType]: img }));
-  }, [validateImageFile, showToast]);
+    if (currentIsNew) {
+      // 신규 등록 중: 로컬 미리보기만 표시하고, 파일은 pending으로 보관
+      if (prev?.url.startsWith('blob:')) URL.revokeObjectURL(prev.url);
+      pendingTypedFilesRef.current[imageType] = file;
+      setTypedImages((p) => ({
+        ...p,
+        [imageType]: { id: localId, type: imageType, url, fileName: file.name, fileSize: file.size, createdAt: new Date().toISOString() },
+      }));
+      return;
+    }
+
+    // 수정 모드: 즉시 API 호출 없이 pending으로 보관
+    if (prev) {
+      if (!prev.id.startsWith('local-')) {
+        // 실제 DB 이미지 → 저장하기 시 삭제 대기열에 추가
+        if (!pendingDeleteIdsRef.current.includes(prev.id)) {
+          pendingDeleteIdsRef.current.push(prev.id);
+        }
+      } else if (prev.url.startsWith('blob:')) {
+        // 이전에도 pending이었던 blob → revoke 후 파일 교체
+        URL.revokeObjectURL(prev.url);
+      }
+    }
+
+    pendingTypedEditRef.current[imageType] = file;
+    setTypedImages((p) => ({
+      ...p,
+      [imageType]: { id: localId, type: imageType, url, fileName: file.name, fileSize: file.size, createdAt: new Date().toISOString() },
+    }));
+    setHasPendingImages(true);
+    showToast('이미지가 대기 중입니다. 저장하기를 눌러 적용하세요.', 'info');
+  }, [validateImageFile, showToast, typedImages, currentIsNew]);
 
   const handleTypedImageRemove = useCallback((imageType: Exclude<ImageType, 'extra'>) => {
-    setTypedImages((prev) => {
-      const target = prev[imageType];
-      if (target?.url.startsWith('blob:')) URL.revokeObjectURL(target.url);
+    const target = typedImages[imageType];
+    if (!target) return;
 
-      const next = { ...prev };
-      delete next[imageType];
-      return next;
-    });
-  }, []);
+    if (target.url.startsWith('blob:')) URL.revokeObjectURL(target.url);
+
+    if (currentIsNew) {
+      // 신규: pending 파일도 제거
+      delete pendingTypedFilesRef.current[imageType];
+    } else if (target.id.startsWith('local-')) {
+      // 수정 모드 pending 이미지 제거: 업로드 대기 파일도 제거
+      delete pendingTypedEditRef.current[imageType];
+    } else {
+      // 수정 모드 실제 DB 이미지: 저장하기 시 삭제 대기열에 추가
+      if (!pendingDeleteIdsRef.current.includes(target.id)) {
+        pendingDeleteIdsRef.current.push(target.id);
+      }
+      setHasPendingImages(true);
+    }
+
+    setTypedImages((p) => { const n = { ...p }; delete n[imageType]; return n; });
+  }, [typedImages, currentIsNew]);
 
   // ── 추가 이미지 업로드 ────────────────────────────────────
-  const handleExtraFilesSelect = useCallback((files: FileList | null) => {
+  const handleExtraFilesSelect = useCallback(async (files: FileList | null) => {
     if (!files) return;
     const remaining = MAX_EXTRA_IMGS - extraImages.length;
     if (remaining <= 0) { showToast('추가 이미지는 최대 20장까지 등록 가능합니다.', 'error'); return; }
 
-    const toAdd: ProductImage[] = [];
-    let addedCount = 0;
-    Array.from(files).forEach((file) => {
-      if (addedCount >= remaining) return;
+    const validFiles: File[] = [];
+    Array.from(files).slice(0, remaining).forEach((file) => {
       const err = validateImageFile(file);
       if (err) { showToast(err, 'error'); return; }
-      const url = URL.createObjectURL(file);
-      toAdd.push({
-        id:        `local-extra-${Date.now()}-${addedCount}`,
-        type:      'extra',
-        url,
-        fileName:  file.name,
-        fileSize:  file.size,
-        order:     extraImages.length + addedCount,
-        createdAt: new Date().toISOString(),
+      validFiles.push(file);
+    });
+    if (validFiles.length === 0) return;
+
+    if (currentIsNew) {
+      // 신규 등록 중: 로컬 미리보기만 추가, 파일 pending 보관
+      const toAdd: ProductImage[] = validFiles.map((file, i) => {
+        const localId = `local-extra-${Date.now()}-${i}`;
+        pendingExtraFilesRef.current.push({ localId, file });
+        return {
+          id: localId, type: 'extra', url: URL.createObjectURL(file),
+          fileName: file.name, fileSize: file.size,
+          order: extraImages.length + i, createdAt: new Date().toISOString(),
+        };
       });
-      addedCount++;
+      setExtraImages((prev) => [...prev, ...toAdd]);
+      return;
+    }
+
+    // 수정 모드: 즉시 API 호출 없이 pending으로 보관
+    const toAdd: ProductImage[] = validFiles.map((file, i) => {
+      const localId = `local-extra-${Date.now()}-${i}`;
+      pendingExtraEditRef.current.push({ localId, file });
+      return {
+        id: localId, type: 'extra' as const,
+        url: URL.createObjectURL(file),
+        fileName: file.name, fileSize: file.size,
+        order: extraImages.length + i,
+        createdAt: new Date().toISOString(),
+      };
     });
     setExtraImages((prev) => [...prev, ...toAdd]);
-  }, [extraImages.length, validateImageFile, showToast]);
+    setHasPendingImages(true);
+    showToast('이미지가 대기 중입니다. 저장하기를 눌러 적용하세요.', 'info');
+  }, [extraImages.length, validateImageFile, showToast, currentIsNew]);
 
   const handleExtraFileDrop = useCallback((e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -833,12 +1136,27 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
   }, [handleExtraFilesSelect]);
 
   const handleExtraImageRemove = useCallback((id: string) => {
-    setExtraImages((prev) => {
-      const target = prev.find((img) => img.id === id);
-      if (target?.url.startsWith('blob:')) URL.revokeObjectURL(target.url);
-      return prev.filter((img) => img.id !== id);
-    });
-  }, []);
+    const target = extraImages.find((img) => img.id === id);
+    if (!target) return;
+
+    if (target.url.startsWith('blob:')) URL.revokeObjectURL(target.url);
+
+    if (currentIsNew) {
+      // 신규: pending 파일도 제거
+      pendingExtraFilesRef.current = pendingExtraFilesRef.current.filter((p) => p.localId !== id);
+    } else if (target.id.startsWith('local-')) {
+      // 수정 모드 pending 이미지 제거: 업로드 대기 파일도 제거
+      pendingExtraEditRef.current = pendingExtraEditRef.current.filter((p) => p.localId !== id);
+    } else {
+      // 수정 모드 실제 DB 이미지: 저장하기 시 삭제 대기열에 추가
+      if (!pendingDeleteIdsRef.current.includes(id)) {
+        pendingDeleteIdsRef.current.push(id);
+      }
+      setHasPendingImages(true);
+    }
+
+    setExtraImages((prev) => prev.filter((img) => img.id !== id));
+  }, [extraImages, currentIsNew]);
 
   // ── 추가 이미지 순서 변경 (드래그) ───────────────────────
   const handleExtraDragStart = useCallback((id: string) => { extraDragIdRef.current = id; }, []);
@@ -860,7 +1178,9 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
   }, []);
 
   // ── 재고 조정 ────────────────────────────────────────────
-  const handleStockAdjust = useCallback(async () => {
+  // 신규 상품: 저장 시 초기재고로 전달 (기존 동작 유지)
+  // 기존 상품: 저장하기 클릭 시 일괄 적용 (pending에 누적)
+  const handleStockAdjust = useCallback(() => {
     const qty = parseInt(adjustQuantity, 10);
     if (!Number.isFinite(qty) || qty <= 0) {
       setAdjustError('수량은 1 이상 정수를 입력해주세요.');
@@ -871,35 +1191,35 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
       return;
     }
     setAdjustError('');
-    setIsAdjusting(true);
-    try {
-      let next: { total: number; sold: number; available: number };
 
-      if (currentIsNew) {
-        // 신규 등록 중: 서비스 호출 없이 로컬 상태만 직접 계산
-        next = { ...stock };
-        if (adjustType === 'in') {
-          next.total     += qty;
-          next.available += qty;
-        } else {
-          next.available -= qty;
-        }
-      } else {
-        // 수정 중: 서비스(Mock API)로 처리
-        next = await adjustStock(currentProduct?.id ?? '', adjustType, qty, adjustReason || undefined);
-      }
-
-      setStock(next);
-      setAdjustQuantity('');
-      setAdjustReason('');
-      showToast('재고가 조정되었습니다.', 'success');
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : '재고 조정에 실패했습니다.';
-      setAdjustError(msg);
-    } finally {
-      setIsAdjusting(false);
+    // 로컬 재고 preview 계산 (DB 반영은 저장하기 클릭 시)
+    const next = { ...stock };
+    if (adjustType === 'in') {
+      next.total     += qty;
+      next.available += qty;
+    } else {
+      next.total     -= qty;
+      next.available -= qty;
     }
-  }, [adjustQuantity, adjustType, adjustReason, stock, currentIsNew, currentProduct?.id, showToast]);
+    setStock(next);
+
+    if (!currentIsNew) {
+      // 기존 상품: pending 목록에 추가 (저장하기 시 API 호출)
+      setPendingStockAdjustments((prev) => [
+        ...prev,
+        { type: adjustType, quantity: qty, reason: adjustReason },
+      ]);
+    }
+
+    setAdjustQuantity('');
+    setAdjustReason('');
+    showToast(
+      currentIsNew
+        ? '재고가 반영되었습니다. 저장 시 적용됩니다.'
+        : '재고 조정이 대기 중입니다. 저장하기를 눌러 적용하세요.',
+      'info',
+    );
+  }, [adjustQuantity, adjustType, adjustReason, stock, currentIsNew, showToast]);
 
   // ── 재고 이력 토글 ───────────────────────────────────────
   const handleHistoryToggle = useCallback(async () => {
@@ -944,13 +1264,13 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
 
   useEffect(() => {
     return () => {
-      // 규격 이미지 정리
-      Object.values(typedImages).forEach((img) => {
+      // 규격 이미지 정리 (ref를 통해 최신 값 참조)
+      Object.values(typedImagesRef.current).forEach((img) => {
         if (img?.url.startsWith('blob:')) URL.revokeObjectURL(img.url);
       });
 
       // 추가 이미지 정리
-      extraImages.forEach((img) => {
+      extraImagesRef.current.forEach((img) => {
         if (img.url.startsWith('blob:')) URL.revokeObjectURL(img.url);
       });
     };
@@ -1014,16 +1334,17 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
           </button>
 
           {/* 삭제 (수정 모드만) */}
-          {/* TODO: Supabase 연동 시 삭제 기능 구현 */}
           {!currentIsNew && (
-            <Link
-              href={`/dashboard/products`}
+            <button
+              type="button"
+              onClick={() => setShowDeleteModal(true)}
+              disabled={isDeleting}
               aria-label="상품 삭제"
-              className="hidden md:flex items-center gap-xs text-bodySm font-medium text-light-error dark:text-dark-error border border-red-200 dark:border-red-900/30 rounded-md px-sm py-xs hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
+              className="hidden md:flex items-center gap-xs text-bodySm font-medium text-light-error dark:text-dark-error border border-red-200 dark:border-red-900/30 rounded-md px-sm py-xs hover:bg-red-50 dark:hover:bg-red-900/10 disabled:opacity-50 transition-colors"
             >
-              <DeleteOutlined aria-hidden="true" />
+              {isDeleting ? <LoadingOutlined aria-hidden="true" className="animate-spin" /> : <DeleteOutlined aria-hidden="true" />}
               삭제
-            </Link>
+            </button>
           )}
         </div>
       </div>
@@ -1107,6 +1428,32 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
             </FieldGroup>
 
             {/* 상품코드 + 판매가 */}
+            <FieldGroup
+              id={fid('categoryId')}
+              label="카테고리"
+              required
+              error={errors.categoryId}
+            >
+              <select
+                ref={categoryRef}
+                id={fid('categoryId')}
+                value={formData.categoryId}
+                aria-required="true"
+                aria-invalid={!!errors.categoryId}
+                aria-describedby={errors.categoryId ? `${fid('categoryId')}-error` : undefined}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setField('categoryId', e.target.value)}
+                onBlur={() => handleBlur('categoryId')}
+                className={inputCls(!!errors.categoryId)}
+              >
+                <option value="">카테고리를 선택해주세요.</option>
+                {categoryOptions.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </FieldGroup>
+
             <div className="flex flex-col sm:flex-row gap-md">
               {/* 상품코드 */}
               <FieldGroup
@@ -1290,6 +1637,7 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
                     key={t}
                     imageType={t}
                     image={typedImages[t] ?? null}
+                    isUploading={false}
                     onFileSelect={handleTypedImageSelect}
                     onRemove={handleTypedImageRemove}
                   />
@@ -1315,6 +1663,7 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
                     key={img.id}
                     image={img}
                     isDragOver={extraDragOver === img.id}
+                    isUploading={false}
                     onRemove={handleExtraImageRemove}
                     onDragStart={handleExtraDragStart}
                     onDragOver={handleExtraDragOver}
@@ -1482,12 +1831,24 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
               <button
                 type="button"
                 onClick={handleStockAdjust}
-                disabled={isAdjusting}
-                className="w-full py-xs text-bodySm font-medium text-white bg-light-primary dark:bg-dark-primary rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-xs"
+                className="w-full py-xs text-bodySm font-medium text-white bg-light-primary dark:bg-dark-primary rounded-md hover:opacity-90 transition-opacity"
               >
-                {isAdjusting ? <LoadingOutlined className="animate-spin" aria-hidden="true" /> : null}
                 재고 조정 적용
               </button>
+
+              {/* 저장 대기 중인 재고 조정 표시 */}
+              {!currentIsNew && pendingStockAdjustments.length > 0 && (
+                <div
+                  role="alert"
+                  className="flex items-center gap-xs px-sm py-xs rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-caption text-amber-700 dark:text-amber-400"
+                >
+                  <WarningOutlined aria-hidden="true" />
+                  <span>
+                    재고 조정 {pendingStockAdjustments.length}건 대기 중 —&nbsp;
+                    <span className="font-semibold">저장하기</span>를 눌러야 실제 반영됩니다.
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* 재고 이력 아코디언 — 수정 모드에서만 표시 */}
@@ -1510,7 +1871,7 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
                 </button>
 
                 {historyOpen && (
-                  <div className="mt-sm overflow-x-auto">
+                  <div className="mt-sm max-h-[320px] overflow-x-auto overflow-y-auto sm:max-h-[360px] lg:max-h-[420px]">
                     <table className="w-full text-caption" aria-label="재고 이력">
                       <thead>
                         <tr className="text-light-textSecondary dark:text-dark-textSecondary border-b border-light-border dark:border-dark-border">
@@ -1615,6 +1976,53 @@ export const ProductDetailForm = ({ product, isNew }: ProductDetailFormProps) =>
           onStay={() => setShowLeaveModal(false)}
           onLeave={handleLeaveConfirm}
         />
+      )}
+
+      {/* ── 상품 삭제 확인 모달 ──────────────────────────── */}
+      {showDeleteModal && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-modal-title"
+        >
+          <div className="absolute inset-0 bg-black/50" aria-hidden="true" onClick={() => setShowDeleteModal(false)} />
+          <div
+            className={[
+              'relative w-full bg-light-surface dark:bg-dark-surface shadow-xl z-10',
+              'rounded-t-lg max-h-[85vh] px-md pt-xs pb-xl',
+              'md:rounded-lg md:w-[420px] md:px-lg md:pt-lg md:pb-lg',
+            ].join(' ')}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-center pt-sm pb-md md:hidden" aria-hidden="true">
+              <div className="w-9 h-1 rounded-full bg-light-border dark:bg-dark-border" />
+            </div>
+            <h2 id="delete-modal-title" className="text-bodyMd font-semibold text-light-textPrimary dark:text-dark-textPrimary mb-sm">
+              상품을 삭제하시겠습니까?
+            </h2>
+            <p className="text-bodySm text-light-textSecondary dark:text-dark-textSecondary mb-lg">
+              <span className="font-semibold text-light-textPrimary dark:text-dark-textPrimary">{currentProduct?.name}</span> 상품과 모든 이미지, 재고 데이터가 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+            </p>
+            <div className="flex gap-sm">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 py-sm px-md rounded-md border border-light-border dark:border-dark-border text-bodySm font-medium text-light-textPrimary dark:text-dark-textPrimary hover:bg-light-secondary dark:hover:bg-dark-secondary transition-colors"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="flex-1 py-sm px-md rounded-md bg-light-error dark:bg-dark-error text-bodySm font-medium text-white hover:opacity-90 transition-opacity"
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
 
       {/* ── 토스트 ───────────────────────────────────────── */}

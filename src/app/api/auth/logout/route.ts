@@ -1,9 +1,19 @@
-import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
 
-const AUTH_COOKIE = 'sellops-auth-token';
-
+/**
+ * Signs out the current Supabase-authenticated user and responds with a success payload.
+ *
+ * @returns An object containing `success: true`, `data: null`, and `error: null`.
+ */
 export async function POST() {
-  const response = NextResponse.json({ success: true, data: null, error: null });
-  response.cookies.delete(AUTH_COOKIE);
-  return response;
+  const supabase = await createClient()
+
+  await supabase.auth.signOut()
+
+  return NextResponse.json({
+    success: true,
+    data: null,
+    error: null,
+  })
 }

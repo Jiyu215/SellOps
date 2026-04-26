@@ -1,29 +1,70 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { OrderDetailView } from '@/components/dashboard/orders/OrderDetailView';
-import type { OrderDetail } from '@/types/orderDetail';
+import { createOrderMemo, fetchOrderDetail, updateOrderStatus } from '@/features/orders/api/order.api';
+import type { OrderDetail, OrderMemoActor } from '@/types/orderDetail';
 import type { Order } from '@/types/dashboard';
 
 interface OrderDetailContentProps {
-  initialOrder: OrderDetail;
+  initialOrderDetail: OrderDetail;
+  currentMemoActor: OrderMemoActor;
 }
 
-/**
- * 주문 상세 콘텐츠 (Client Component)
- *
- * 상태 변경(OrderActionCell → onOrderUpdate)을 처리하고
- * OrderDetailView에 최신 order를 전달한다.
- */
-export const OrderDetailContent = ({ initialOrder }: OrderDetailContentProps) => {
-  const [order, setOrder] = useState<OrderDetail>(initialOrder);
+export const OrderDetailContent = ({
+  initialOrderDetail,
+  currentMemoActor,
+}: OrderDetailContentProps) => {
+  const [order, setOrder] = useState<OrderDetail>(initialOrderDetail);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const refreshOrderDetail = useCallback(async (id: string) => {
+    const updatedOrder = await fetchOrderDetail(id);
+    setErrorMsg('');
+    setOrder(updatedOrder);
+  }, []);
 
   const handleOrderUpdate = useCallback(
-    (id: string, partial: Partial<Pick<Order, 'orderStatus' | 'paymentStatus' | 'shippingStatus'>>) => {
-      setOrder((prev) => (prev.id === id ? { ...prev, ...partial } : prev));
+    async (id: string, partial: Partial<Pick<Order, 'orderStatus' | 'paymentStatus' | 'shippingStatus'>>) => {
+      try {
+        await updateOrderStatus(id, partial);
+        await refreshOrderDetail(id);
+      } catch (error) {
+        setErrorMsg(
+          error instanceof Error && error.message
+            ? error.message
+            : '주문 상태 변경에 실패했습니다.',
+        );
+      }
     },
-    [],
+    [refreshOrderDetail],
   );
 
-  return <OrderDetailView order={order} onOrderUpdate={handleOrderUpdate} />;
+  const handleMemoCreate = useCallback(
+    async (id: string, content: string) => {
+      try {
+        await createOrderMemo(id, content);
+        await refreshOrderDetail(id);
+      } catch {
+        setErrorMsg('주문 메모 등록에 실패했습니다.');
+      }
+    },
+    [refreshOrderDetail],
+  );
+
+  return (
+    <>
+      {errorMsg && (
+        <p className="mb-sm text-caption text-light-error dark:text-dark-error">
+          {errorMsg}
+        </p>
+      )}
+      <OrderDetailView
+        order={order}
+        currentMemoActor={currentMemoActor}
+        onOrderUpdate={handleOrderUpdate}
+        onMemoCreate={handleMemoCreate}
+      />
+    </>
+  );
 };

@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { useNotifications } from '@/features/notifications/hooks/useNotifications';
 import type { UserProfile, Notification } from '@/types/dashboard';
 
 interface DashboardLayoutProps {
@@ -22,7 +23,7 @@ interface DashboardLayoutProps {
  * - active 메뉴 상태: Sidebar 내부에서 usePathname()으로 URL 기반 판별
  *   → 로컬 state 불필요, 새로고침·공유 URL에서도 정확히 동작
  * - mobileOpen 상태: Header(햄버거 버튼) ↔ Sidebar(슬라이드인) 공유
- * - notifications 상태: 읽음 처리를 포함한 알림 목록 관리
+ * - notifications: useNotifications 훅으로 초기값 + 30초 폴링 + 읽음 처리 API 연동
  */
 export const DashboardLayout = ({
   children,
@@ -33,19 +34,8 @@ export const DashboardLayout = ({
 }: DashboardLayoutProps) => {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
 
-  /** 단건 읽음 처리 */
-  const handleMarkRead = useCallback((id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
-    );
-  }, []);
-
-  /** 전체 읽음 처리 */
-  const handleMarkAllRead = useCallback(() => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-  }, []);
+  const { notifications, refresh, markRead, markAllRead } = useNotifications(initialNotifications);
 
   /** 로그아웃: 쿠키 삭제 후 로그인 페이지로 이동 */
   const handleLogout = useCallback(async () => {
@@ -73,8 +63,9 @@ export const DashboardLayout = ({
             currentUser={currentUser}
             pageTitle={pageTitle}
             notifications={notifications}
-            onMarkRead={handleMarkRead}
-            onMarkAllRead={handleMarkAllRead}
+            onMarkRead={markRead}
+            onMarkAllRead={markAllRead}
+            onRefreshNotifications={refresh}
             mobileMenuOpen={mobileOpen}
             onMobileMenuToggle={() => setMobileOpen((prev) => !prev)}
           />
@@ -103,8 +94,8 @@ export const DashboardLayout = ({
           currentUser={currentUser}
           pageTitle={pageTitle}
           notifications={notifications}
-          onMarkRead={handleMarkRead}
-          onMarkAllRead={handleMarkAllRead}
+          onMarkRead={markRead}
+          onMarkAllRead={markAllRead}
           mobileMenuOpen={mobileOpen}
           onMobileMenuToggle={() => setMobileOpen((prev) => !prev)}
         />

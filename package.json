@@ -12,11 +12,14 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.1",
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.104.0",
     "next": "16.1.6",
     "next-auth": "^4.24.13",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "recharts": "^3.8.1"
+    "recharts": "^3.8.1",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",

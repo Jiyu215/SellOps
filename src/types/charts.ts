@@ -20,6 +20,10 @@ export type EnrichedDailyPoint = DailyDataPoint & {
   changeRevenue: number | null;
   /** 전일 대비 주문 변화율(%), 첫 번째 데이터 포인트는 null */
   changeOrders: number | null;
+  /** 전일 매출 원본값 */
+  previousRevenue: number;
+  /** 전일 주문 수 원본값 */
+  previousOrders: number;
   /** 마지막 데이터 포인트(오늘) 여부 — KPI 카드 값과 연동 */
   isToday: boolean;
 };

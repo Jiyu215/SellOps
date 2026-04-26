@@ -27,30 +27,20 @@ export interface UseSearchInputReturn {
 }
 
 /**
- * 검색 입력 훅 — debounce + 한글 IME 처리
+ * Manages a search input with debounce and correct handling for Hangul IME composition.
  *
- * ### 한글 IME 처리 전략
- * 브라우저는 한글 조합 중(ㅎ→하→한)에도 onChange를 발화하므로,
- * 부분 완성 문자열로 URL 쿼리가 매 키스트로크마다 갱신되는 문제가 발생한다.
+ * Ensures composition (IME) does not trigger intermediate searches, debounces normal typing,
+ * immediately triggers search when composition ends, prevents duplicate searches for the same
+ * normalized value, and aborts any in-flight work when new searches start or on unmount.
  *
- * - `onCompositionStart`: 조합 중 플래그 ON → onChange에서 검색 보류
- * - `onCompositionEnd`: 조합 완료 → debounce 없이 즉시 검색 실행
- * - Chrome 이벤트 순서: compositionEnd → onChange (동일 값으로 중복 발화)
- *   → lastTriggeredRef로 마지막 실행 값 추적, 동일 값 재호출 차단
- *
- * ### AbortController
- * 현재는 동기 클라이언트 필터링이라 취소 효과 없음.
- * 실제 API 연동 시 `onSearch(value, signal)` 형태로 확장해
- * 이전 요청을 취소하고 최신 응답만 반영할 수 있다.
- *
- * @example
- * ```tsx
- * const { inputValue, ...handlers } = useSearchInput({
- *   initialValue: filter.search,
- *   onSearch: handleSearch,
- * });
- * <input value={inputValue} {...handlers} />
- * ```
+ * @param initialValue - Initial input text (used to restore URL/bookmarked state). The hook only syncs this into local state when the user has not locally diverged.
+ * @param onSearch - Called with the normalized search string (whitespace removed) when a search is confirmed.
+ * @param delay - Debounce delay in milliseconds applied to normal typing (defaults to SEARCH_DEBOUNCE_DELAY_MS).
+ * @returns An object containing:
+ *  - `inputValue`: local input string used for rendering.
+ *  - `onInputChange`: change handler for the input element.
+ *  - `onCompositionStart`: IME composition start handler.
+ *  - `onCompositionEnd`: IME composition end handler that triggers an immediate search.
  */
 export function useSearchInput({
   initialValue = '',
@@ -64,6 +54,8 @@ export function useSearchInput({
   const lastTriggeredRef   = useRef(initialValue);
   const debounceTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const inputValueRef      = useRef(initialValue);
+  const prevInitialRef     = useRef(initialValue);
 
   // onSearch 최신 참조 유지 — deps 없이 항상 현재 함수를 호출
   const onSearchRef = useRef(onSearch);
@@ -71,12 +63,20 @@ export function useSearchInput({
 
   useEffect(()=>{
     const normalized = initialValue.replace(/\s+/g, '');
-    setInputValue(initialValue);
-    lastTriggeredRef.current = normalized;
-    if (debounceTimerRef.current !== null) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
+    const shouldSyncInput = inputValueRef.current === prevInitialRef.current;
+
+    if (shouldSyncInput) {
+      // Sync the input from the URL only while the user has not diverged locally.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setInputValue(initialValue);
+      inputValueRef.current = initialValue;
+      lastTriggeredRef.current = normalized;
+      if (debounceTimerRef.current !== null) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
     }
+    prevInitialRef.current = initialValue;
   },[initialValue]);
 
   // 언마운트 시 펜딩 타이머·요청 정리
@@ -128,10 +128,12 @@ export function useSearchInput({
   }, [triggerImmediate]);
 
   const onInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
+    const nextValue = e.target.value;
+    inputValueRef.current = nextValue;
+    setInputValue(nextValue);
     // 조합 중이 아닐 때만 debounce 검색 실행
     // 조합 완료는 onCompositionEnd에서 처리
-    if (!isComposingRef.current) triggerDebounced(e.target.value);
+    if (!isComposingRef.current) triggerDebounced(nextValue);
   }, [triggerDebounced]);
 
   return { inputValue, onInputChange, onCompositionStart, onCompositionEnd };
