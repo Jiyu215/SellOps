@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 import { NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getOrders } from '@/dal/orders';
@@ -523,82 +524,94 @@ async function getMonthlySalesData(supabaseAdmin: DashboardSupabaseClient): Prom
   });
 }
 
+// 월별 카테고리 비중을 캐싱한다 — 동일 월이면 재계산하지 않는다.
+// start/end가 월 단위로 변경되므로 캐시 키도 월 단위로 갱신된다.
+const getCategoryDataCached = unstable_cache(
+  async (start: string, end: string): Promise<CategoryDataPoint[]> => {
+    const supabaseAdmin = getSupabaseAdmin() as DashboardSupabaseClient;
+
+    const { data: categoryRows, error: categoryListError } = await supabaseAdmin
+      .from('categories')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true });
+
+    if (categoryListError) throw categoryListError;
+
+    const categories = (categoryRows ?? []) as CategoryRow[];
+
+    const { data: orders, error: orderError } = await supabaseAdmin
+      .from('orders')
+      .select('id')
+      .eq('payment_status', 'payment_completed')
+      .eq('shipping_status', 'shipping_completed')
+      .neq('order_status', 'order_cancelled')
+      .gte('created_at', start)
+      .lt('created_at', end);
+
+    if (orderError) throw orderError;
+
+    const orderIds = (orders ?? []).map((order) => order.id);
+    const revenueByCategory = new Map<string, number>(
+      [...categories.map((category) => [category.name, 0] as const), ['미분류', 0]],
+    );
+
+    if (orderIds.length === 0) {
+      return toCategoryPercentages(
+        [...revenueByCategory.entries()].map(([name, revenue]) => ({ name, revenue })),
+      );
+    }
+
+    const { data: orderItems, error: orderItemError } = await supabaseAdmin
+      .from('order_items')
+      .select('order_id, product_id, price, quantity')
+      .in('order_id', orderIds);
+
+    if (orderItemError) throw orderItemError;
+
+    const productIds = [...new Set((orderItems ?? []).map((item) => item.product_id))];
+    if (productIds.length === 0) {
+      return [];
+    }
+
+    const { data: products, error: productError } = await supabaseAdmin
+      .from('products')
+      .select('id, category_id')
+      .in('id', productIds);
+
+    if (productError) throw productError;
+
+    const productCategoryMap = new Map<string, string | null>(
+      ((products ?? []) as ProductCategoryRow[]).map((product) => [product.id, product.category_id]),
+    );
+    const categoryNameMap = new Map<string, string>(
+      categories.map((category) => [category.id, category.name]),
+    );
+
+    for (const item of (orderItems ?? []) as Array<Pick<OrderItemSalesRow, 'product_id' | 'price' | 'quantity'>>) {
+      const categoryId = productCategoryMap.get(item.product_id) ?? null;
+      const categoryName = categoryId ? (categoryNameMap.get(categoryId) ?? '미분류') : '미분류';
+      const revenue = item.price * item.quantity;
+
+      revenueByCategory.set(categoryName, (revenueByCategory.get(categoryName) ?? 0) + revenue);
+    }
+
+    const sorted = [...revenueByCategory.entries()]
+      .map(([name, revenue]) => ({ name, revenue }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    return toCategoryPercentages(sorted);
+  },
+  ['dashboard-category'],
+  { revalidate: false },
+);
+
 async function getCategoryData(
-  supabaseAdmin: DashboardSupabaseClient,
+  _supabaseAdmin: DashboardSupabaseClient,
 ): Promise<CategoryDataPoint[]> {
   const { start, end } = getKstCurrentMonthRange();
-  const { data: categoryRows, error: categoryListError } = await supabaseAdmin
-    .from('categories')
-    .select('id, name')
-    .eq('is_active', true)
-    .order('sort_order', { ascending: true })
-    .order('name', { ascending: true });
-
-  if (categoryListError) throw categoryListError;
-
-  const categories = (categoryRows ?? []) as CategoryRow[];
-
-  const { data: orders, error: orderError } = await supabaseAdmin
-    .from('orders')
-    .select('id')
-    .eq('payment_status', 'payment_completed')
-    .eq('shipping_status', 'shipping_completed')
-    .neq('order_status', 'order_cancelled')
-    .gte('created_at', start)
-    .lt('created_at', end);
-
-  if (orderError) throw orderError;
-
-  const orderIds = (orders ?? []).map((order) => order.id);
-  const revenueByCategory = new Map<string, number>(
-    [...categories.map((category) => [category.name, 0] as const), ['미분류', 0]],
-  );
-
-  if (orderIds.length === 0) {
-    return toCategoryPercentages(
-      [...revenueByCategory.entries()].map(([name, revenue]) => ({ name, revenue })),
-    );
-  }
-
-  const { data: orderItems, error: orderItemError } = await supabaseAdmin
-    .from('order_items')
-    .select('order_id, product_id, price, quantity')
-    .in('order_id', orderIds);
-
-  if (orderItemError) throw orderItemError;
-
-  const productIds = [...new Set((orderItems ?? []).map((item) => item.product_id))];
-  if (productIds.length === 0) {
-    return [];
-  }
-
-  const { data: products, error: productError } = await supabaseAdmin
-    .from('products')
-    .select('id, category_id')
-    .in('id', productIds);
-
-  if (productError) throw productError;
-
-  const productCategoryMap = new Map<string, string | null>(
-    ((products ?? []) as ProductCategoryRow[]).map((product) => [product.id, product.category_id]),
-  );
-  const categoryNameMap = new Map<string, string>(
-    categories.map((category) => [category.id, category.name]),
-  );
-
-  for (const item of (orderItems ?? []) as Array<Pick<OrderItemSalesRow, 'product_id' | 'price' | 'quantity'>>) {
-    const categoryId = productCategoryMap.get(item.product_id) ?? null;
-    const categoryName = categoryId ? (categoryNameMap.get(categoryId) ?? '미분류') : '미분류';
-    const revenue = item.price * item.quantity;
-
-    revenueByCategory.set(categoryName, (revenueByCategory.get(categoryName) ?? 0) + revenue);
-  }
-
-  const sorted = [...revenueByCategory.entries()]
-    .map(([name, revenue]) => ({ name, revenue }))
-    .sort((a, b) => b.revenue - a.revenue);
-
-  return toCategoryPercentages(sorted);
+  return getCategoryDataCached(start, end);
 }
 
 async function getCompletedOrdersForTopProducts(supabaseAdmin: DashboardSupabaseClient) {

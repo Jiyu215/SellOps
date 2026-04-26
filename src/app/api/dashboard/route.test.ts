@@ -3,6 +3,9 @@
  */
 
 jest.mock('next/headers', () => ({}), { virtual: true });
+jest.mock('next/cache', () => ({
+  unstable_cache: <T extends (...args: Parameters<T>) => ReturnType<T>>(fn: T) => fn,
+}), { virtual: true });
 
 type MockRouteResponse = {
   body: unknown;
@@ -333,7 +336,7 @@ describe('GET /api/dashboard', () => {
     };
 
     expect(response.status).toBe(200);
-    expect(mockGetSupabaseAdmin).toHaveBeenCalledTimes(1);
+    expect(mockGetSupabaseAdmin).toHaveBeenCalledTimes(2);
 
     expect(revenueQuery.eq).toHaveBeenCalledWith('order_status', 'order_completed');
     expect(revenueQuery.eq).toHaveBeenCalledWith('payment_status', 'payment_completed');
