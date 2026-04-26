@@ -12,6 +12,15 @@ const DASHBOARD_FALLBACK_USER: UserProfile = {
   avatarUrl: undefined,
 }
 
+/**
+ * Resolve the current dashboard user profile, falling back to a predefined admin profile when unauthenticated.
+ *
+ * The returned profile is built from the authenticated user's data with preference for values stored in the `profiles`
+ * table. The `name` is selected in order: `profiles.name`, auth `user_metadata.name`, auth `email`, then the fallback
+ * name. The `email` is selected in order: `profiles.email`, auth `email`, then an empty string.
+ *
+ * @returns A `UserProfile` representing the current dashboard user. If no authenticated user exists, returns `DASHBOARD_FALLBACK_USER`.
+ */
 export async function getDashboardUser(): Promise<UserProfile> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -33,6 +42,11 @@ export async function getDashboardUser(): Promise<UserProfile> {
   }
 }
 
+/**
+ * Create an OrderMemoActor representing the current dashboard user.
+ *
+ * @returns An `OrderMemoActor` whose `name` is the current dashboard user's name and whose `type` is `'admin'`.
+ */
 export async function getCurrentMemoActor(): Promise<OrderMemoActor> {
   const currentUser = await getDashboardUser()
 

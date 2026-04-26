@@ -10,8 +10,12 @@ export interface CreateNotificationParams {
 }
 
 /**
- * 서버사이드에서 알림을 DB에 생성한다.
- * 실패해도 호출 측 로직에 영향을 주지 않도록 내부에서 오류를 흡수한다.
+ * Create a notification record in the server-side database.
+ *
+ * Creates a single row in the `notifications` table. If insertion fails, the error is
+ * silently absorbed so the caller's control flow is not affected.
+ *
+ * @param params - Fields describing the notification to create; `link` may be `undefined` or `null`
  */
 export async function createNotification(params: CreateNotificationParams): Promise<void> {
   try {
@@ -29,8 +33,12 @@ export async function createNotification(params: CreateNotificationParams): Prom
 }
 
 /**
- * 복수 알림을 단일 INSERT로 일괄 생성한다.
- * 실패해도 호출 측 로직에 영향을 주지 않는다.
+ * Create multiple notification records in a single bulk insert.
+ *
+ * Performs one insert for all provided items; returns immediately if `items` is empty.
+ * Any insertion errors are caught and suppressed so callers are not affected.
+ *
+ * @param items - Array of notification parameters to persist; each item becomes one record
  */
 export async function createNotifications(items: CreateNotificationParams[]): Promise<void> {
   if (items.length === 0) return

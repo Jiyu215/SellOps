@@ -4,6 +4,18 @@ import type { ProductStatus } from '@/features/products/types/product.type'
 import { requireAuth } from '@/lib/api/requireAuth'
 import { createNotification } from '@/lib/notifications'
 
+/**
+ * Exports product records as a UTF-8 CSV file attachment.
+ *
+ * Reads optional `search` and `status` query parameters from the request URL, queries the `products_with_stock`
+ * view with the specified filters, converts the results into a BOM-prefixed CSV (Korean status labels applied),
+ * emits a system info notification indicating export completion, and returns the CSV as a downloadable response.
+ *
+ * @param request - Incoming request; `search` and `status` may be provided as URL query parameters.
+ * @returns A Response containing the CSV data with `Content-Type: text/csv; charset=utf-8` and a `Content-Disposition`
+ * header naming the file `products_YYYYMMDD.csv`. On failure, returns a JSON response `{ error: 'CSV 내보내기에 실패했습니다.' }`
+ * with HTTP status 500.
+ */
 export async function GET(request: Request) {
   const auth = await requireAuth()
   if (!auth.ok) return auth.response

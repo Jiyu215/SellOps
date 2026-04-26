@@ -7,6 +7,16 @@ import { createNotification } from '@/lib/notifications'
 const ALLOWED_FORMATS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
 const MAX_SIZE_MB = 10
 
+/**
+ * Handle authenticated upload of an image for a specific product.
+ *
+ * Validates file extension and size, enforces a 20-image limit for `extra` images, stores the file in Supabase Storage,
+ * and inserts a corresponding `product_images` record.
+ *
+ * @param request - Incoming multipart/form-data request containing `file`, `type`, and optional `order`
+ * @param params - Route parameters promise resolving to an object with `id` (the target product ID)
+ * @returns The HTTP Response: on success returns the created image record as JSON with status 201; on validation failures returns 400 with an error message; on unexpected errors returns 500 with a generic error message.
+ */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

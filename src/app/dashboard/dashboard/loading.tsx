@@ -2,11 +2,11 @@ import { DashboardLayout, DashboardSkeleton } from '@/components/dashboard';
 import { MOCK_USER } from '@/constants/mockData';
 
 /**
- * Next.js App Router 자동 로딩 UI
+ * Render the dashboard loading UI used by the Next.js App Router during initial page load and client-side navigation.
  *
- * - 페이지 첫 로드 또는 클라이언트 내비게이션 시 page.tsx 대신 표시
- * - DashboardLayout을 그대로 사용해 사이드바·헤더 레이아웃 유지 (CLS 방지)
- * - DashboardSkeleton: CSS animate-pulse 전용, JS 타이머 없음
+ * Displays the standard dashboard layout populated with a skeleton placeholder so the sidebar and header remain stable while content loads.
+ *
+ * @returns The JSX element that renders the dashboard skeleton inside the dashboard layout
  */
 export default function DashboardLoading() {
   return (

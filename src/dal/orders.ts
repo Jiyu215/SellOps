@@ -61,6 +61,12 @@ const MEMO_AUTHOR_LABEL: Record<MemoAuthorType, string> = {
   customer: '고객',
 }
 
+/**
+ * Convert a single order item database row into an OrderProduct domain object.
+ *
+ * @param row - The order item row from the database
+ * @returns An OrderProduct with `name`, `sku` (uses `product_code` or falls back to `product_id`), `quantity`, and `unitPrice`
+ */
 function toOrderProduct(row: OrderItemRow): OrderProduct {
   return {
     name:      row.product_name,
@@ -70,6 +76,13 @@ function toOrderProduct(row: OrderItemRow): OrderProduct {
   }
 }
 
+/**
+ * Builds an Order domain object from a database order row and its item rows.
+ *
+ * @param row - The order database row containing order-level fields
+ * @param itemRows - The order item rows to be converted into `products`
+ * @returns An Order object with customer info, mapped products, payment/status fields, `createdAt` (falls back to `updated_at` or empty string), `paymentMethod` defaulting to `'card'` when absent, and `shippingAddress` set to `undefined` when not provided
+ */
 function toOrder(row: OrderRow, itemRows: OrderItemRow[]): Order {
   return {
     id:          row.id,
@@ -90,6 +103,12 @@ function toOrder(row: OrderRow, itemRows: OrderItemRow[]): Order {
   }
 }
 
+/**
+ * Group order item rows by their `order_id`.
+ *
+ * @param itemRows - Array of order item rows to group
+ * @returns A Map where each key is an order ID and each value is an array of `OrderItemRow` belonging to that order
+ */
 function groupItemsByOrderId(itemRows: OrderItemRow[]) {
   const itemsByOrderId = new Map<string, OrderItemRow[]>()
 
@@ -102,10 +121,26 @@ function groupItemsByOrderId(itemRows: OrderItemRow[]) {
   return itemsByOrderId
 }
 
+/**
+ * Establishes the base timestamp for synthetic order timeline entries.
+ *
+ * @param row - Order row; `created_at` is preferred and `updated_at` is used if `created_at` is missing
+ * @returns A Date used as the base timestamp: `created_at` if present, otherwise `updated_at`, otherwise the current time
+ */
 function makeTimelineBaseDate(row: OrderRow) {
   return new Date(row.created_at ?? row.updated_at ?? Date.now())
 }
 
+/**
+ * Appends a status history entry computed from a base date and minute offset.
+ *
+ * @param entries - The array that will receive the new history entry.
+ * @param baseDate - Reference date used to compute the entry's timestamp.
+ * @param minsOffset - Minutes to add to `baseDate` to create the entry timestamp.
+ * @param label - Display label for the history entry.
+ * @param actor - Actor name associated with the entry.
+ * @param reason - Optional reason text to include on the entry.
+ */
 function addHistoryEntry(
   entries: OrderStatusHistoryEntry[],
   baseDate: Date,
@@ -122,6 +157,12 @@ function addHistoryEntry(
   })
 }
 
+/**
+ * Builds a chronological status timeline for an order by synthesizing history entries from the order's current status fields.
+ *
+ * @param row - Order row used to derive timeline entries when persisted history is absent
+ * @returns An array of OrderStatusHistoryEntry objects representing the order's status timeline, sorted newest-first by timestamp
+ */
 function buildStatusHistory(row: OrderRow): OrderStatusHistoryEntry[] {
   const entries: OrderStatusHistoryEntry[] = []
   const baseDate = makeTimelineBaseDate(row)
@@ -190,6 +231,12 @@ function buildStatusHistory(row: OrderRow): OrderStatusHistoryEntry[] {
   return entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 }
 
+/**
+ * Creates a memo log entry from an order row when a memo is present.
+ *
+ * @param row - The order row that may contain `memo`, `created_at`, and `updated_at` fields
+ * @returns An array containing a single `OrderMemoEntry` for the order's memo, or an empty array if the memo is missing or blank
+ */
 function buildMemoLog(row: OrderRow): OrderMemoEntry[] {
   if (!row.memo?.trim()) return []
 
@@ -205,6 +252,11 @@ function buildMemoLog(row: OrderRow): OrderMemoEntry[] {
   ]
 }
 
+/**
+ * Convert a persisted memo row into an OrderMemoEntry.
+ *
+ * @returns An OrderMemoEntry containing `id`, `timestamp`, `author` (uses `row.author_name` when present; otherwise a localized label for `row.author_type`), `authorType`, and `content`.
+ */
 function toMemoEntry(row: OrderMemoRow): OrderMemoEntry {
   return {
     id:         row.id,
@@ -215,11 +267,27 @@ function toMemoEntry(row: OrderMemoRow): OrderMemoEntry {
   }
 }
 
+/**
+ * Map a status key to its user-facing label for display; return an empty string for null/empty input.
+ *
+ * @param value - The status key to format (e.g., `payment_completed`) or `null`
+ * @returns The mapped display label when available, the original `value` when no mapping exists, or `''` when `value` is null/empty
+ */
 function formatStatusValue(value: string | null) {
   if (!value) return ''
   return STATUS_VALUE_LABEL[value] ?? value
 }
 
+/**
+ * Convert a persisted order status history row into a display-ready status history entry.
+ *
+ * @param row - The status history row from the database to convert
+ * @returns An OrderStatusHistoryEntry with:
+ *  - `timestamp` taken from the row's `created_at`
+ *  - `label` combining the status type and `from → to` when `from` exists, otherwise `type: to`
+ *  - `actor` using `actor_name` when present, otherwise a localized label for `actor_type`
+ *  - `reason` included when present on the row
+ */
 function toStatusHistoryEntry(row: OrderStatusHistoryRow): OrderStatusHistoryEntry {
   const typeLabel = STATUS_TYPE_LABEL[row.status_type]
   const fromLabel = formatStatusValue(row.from_status)
@@ -233,6 +301,12 @@ function toStatusHistoryEntry(row: OrderStatusHistoryRow): OrderStatusHistoryEnt
   }
 }
 
+/**
+ * Build shipping information from an order's customer fields.
+ *
+ * @param row - The order row to extract recipient name and phone from
+ * @returns Shipping info with `carrier` and `trackingNumber` set to empty strings, `recipientName` set to the order's `customer_name`, and `recipientPhone` set to the order's `customer_phone` or an empty string if absent
+ */
 function buildShippingInfo(row: OrderRow): OrderShippingInfo {
   return {
     carrier:        '',
@@ -242,6 +316,15 @@ function buildShippingInfo(row: OrderRow): OrderShippingInfo {
   }
 }
 
+/**
+ * Builds a complete OrderDetail object from an order row and its related rows.
+ *
+ * @param row - The primary order row used as the source of truth for order fields.
+ * @param itemRows - Order item rows associated with the order; used to populate products and compute totals.
+ * @param memoRows - Optional persisted memo rows; when provided and non-empty they are converted into the memo log, otherwise a synthesized memo log is produced from `row`.
+ * @param statusHistoryRows - Optional persisted status history rows; when provided they are converted into the status history, otherwise a synthesized status history is produced from `row`.
+ * @returns The assembled OrderDetail including products, shipping info, shippingFee (derived from totals), memoLog, statusHistory, and other order fields.
+ */
 function toOrderDetail(
   row: OrderRow,
   itemRows: OrderItemRow[],
@@ -265,18 +348,40 @@ function toOrderDetail(
   }
 }
 
+/**
+ * Detects whether an error corresponds to a missing `order_status_histories` table.
+ *
+ * @param error - Error-like object potentially containing `code` and `message` fields
+ * @returns `true` if the error indicates the `order_status_histories` table is missing, `false` otherwise
+ */
 function isMissingHistoryTableError(error: { code?: string; message?: string }) {
   return error.code === '42P01' ||
     error.code === 'PGRST205' ||
     Boolean(error.message?.includes('order_status_histories'))
 }
 
+/**
+ * Detects whether an error indicates the `order_memos` table is missing.
+ *
+ * @param error - Error object returned by Supabase/PostgREST
+ * @returns `true` if the error represents a missing `order_memos` table, `false` otherwise.
+ */
 function isMissingMemoTableError(error: { code?: string; message?: string }) {
   return error.code === '42P01' ||
     error.code === 'PGRST205' ||
     Boolean(error.message?.includes('order_memos'))
 }
 
+/**
+ * Fetches a paginated list of orders, attaches their products, and returns the total count.
+ *
+ * @param query - Optional filters and pagination: `page` (1-based), `limit`, `search` (matches order number, customer name, or email), `orderStatus`, `paymentStatus`, `shippingStatus`, and `paymentMethod`.
+ * @returns An object with:
+ *  - `items`: Array of `Order` objects (each includes its products),
+ *  - `total`: Total number of orders matching the filters,
+ *  - `page`: Resolved page number,
+ *  - `limit`: Resolved page size
+ */
 export async function getOrders(
   supabase: OrderSupabaseClient,
   query: OrderListQuery = {}
@@ -341,6 +446,15 @@ export async function getOrders(
   }
 }
 
+/**
+ * Fetches full details for a single order, including items, memo log, and status history.
+ *
+ * If memo or status-history tables are missing, their logs are treated as absent and the function falls back to synthesized memo/status entries. Throws when required queries fail.
+ *
+ * @param id - The order's unique identifier
+ * @returns An OrderDetail for the specified order, or `null` if no order with the given id exists
+ * @throws When the orders or order_items queries fail, or when memo/status queries fail for reasons other than a missing table
+ */
 export async function getOrderDetail(
   supabase: OrderSupabaseClient,
   id: string,

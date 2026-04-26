@@ -2,6 +2,12 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/requireAuth'
 
+/**
+ * Mark a notification as read by setting its `is_read` flag to `true`.
+ *
+ * @param params - A promise that resolves to route parameters containing `id`
+ * @returns `{ success: true }` on success; on failure returns `{ error: '읽음 처리에 실패했습니다.' }` with HTTP status 500
+ */
 export async function PATCH(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }

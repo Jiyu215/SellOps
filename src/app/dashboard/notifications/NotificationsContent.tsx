@@ -38,7 +38,21 @@ interface NotificationsContentProps {
   initialSummary:       NotificationListSummary;
 }
 
-// ── URL ↔ 필터 상태 동기화 유틸 ──────────────────────────────────
+/**
+ * Build URLSearchParams representing the current notification filter and pagination state.
+ *
+ * Encodes `status`, `level`, `type`, `period`, `page`, and `limit` according to the UI rules:
+ * - `status=unread` when `readStatus` is `'unread'` or when `summaryTab` is `'unread'`, `'critical'`, or `'warning'`.
+ * - `level=critical` or `level=warning` when `summaryTab` is `'critical'` or `'warning'` (these also imply `status=unread`).
+ * - `query.level` is included only when not overridden by `summaryTab` critical/warning.
+ * - `page` is included only when greater than 1.
+ * - `limit` is included only when it differs from the default (20).
+ *
+ * @param query - Effective notification query (may include `type`, `level`, `period`, `page`, `limit`).
+ * @param readStatus - Current read-status filter (`'unread'` or `'all'`).
+ * @param summaryTab - Active summary tab (`'all' | 'unread' | 'critical' | 'warning'`) which can override `level` and `status`.
+ * @returns URLSearchParams containing the encoded query parameters for use in the URL.
+ */
 function buildParams(
   query: NotificationListQuery,
   readStatus: ReadStatus,
@@ -385,6 +399,16 @@ export const NotificationsContent = ({
   );
 };
 
+/**
+ * Produce a pagination sequence of page numbers with `'...'` markers to condense long ranges.
+ *
+ * For totals up to 7 this returns every page; for larger totals it includes the first and last
+ * pages, a window around the `current` page, and `'...'` where ranges are collapsed.
+ *
+ * @param current - The current active page (1-based)
+ * @param total - The total number of pages
+ * @returns An array of page numbers and `'...'` markers representing the pagination buttons in order
+ */
 function buildPageRange(current: number, total: number): (number | '...')[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
 

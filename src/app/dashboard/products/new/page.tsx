@@ -11,10 +11,14 @@ export const metadata = {
 };
 
 /**
- * 상품 신규 등록 페이지 (Server Component)
+ * Renders the dashboard page for creating a new product.
  *
- * - product prop 없음 → isNew=true
- * - ProductDetailForm이 클라이언트 컴포넌트이므로 Suspense로 감쌈.
+ * Fetches the current dashboard user, product category options, and initial notifications in parallel,
+ * then renders DashboardLayout with those values. Inside the layout, renders ProductDetailForm with
+ * `isNew=true` and the fetched `categoryOptions`, wrapped in a Suspense that falls back to
+ * ProductDetailSkeleton while the client component loads.
+ *
+ * @returns A React element representing the "new product" dashboard page.
  */
 export default async function ProductNewPage() {
   const [currentUser, categoryOptions, notifications] = await Promise.all([

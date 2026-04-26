@@ -28,6 +28,14 @@ class OrderStockError extends Error {
   }
 }
 
+/**
+ * Determines whether an error indicates the `order_status_histories` table is missing.
+ *
+ * Checks common Postgres/PostgREST/Supabase error signals (error codes or message content) to decide.
+ *
+ * @param error - Error object that may include `code` and/or `message` properties from the database layer
+ * @returns `true` if the error corresponds to a missing `order_status_histories` table, `false` otherwise
+ */
 function isMissingHistoryTableError(error: { code?: string; message?: string }) {
   return (
     error.code === '42P01' ||
@@ -36,6 +44,13 @@ function isMissingHistoryTableError(error: { code?: string; message?: string }) 
   )
 }
 
+/**
+ * Determines the stock operation required for an order based on the current order snapshot and the requested status update.
+ *
+ * @param current - Current order status snapshot (includes `order_status`, `payment_status`, `shipping_status`, `stock_status`, and `order_number`)
+ * @param next - Partial status update payload specifying any of `order_status`, `payment_status`, or `shipping_status`
+ * @returns `'reserve'` when stock should be reserved for an order; `'finalize'` when reserved stock should be finalized (permanently deducted); `'restock'` when stock should be returned to inventory; `'none'` when no stock-related action is required
+ */
 function getStockAction(
   current: OrderStatusSnapshot,
   next: OrderStatusUpdateInput,
@@ -78,6 +93,12 @@ function getStockAction(
   return 'none'
 }
 
+/**
+ * Map a stock action to the resulting order `stock_status`.
+ *
+ * @param action - The computed stock action (`'none' | 'reserve' | 'finalize' | 'restock'`)
+ * @returns `'applied'` when `action` is `'reserve'` or `'finalize'`, `'released'` when `action` is `'restock'`, `'none'` otherwise
+ */
 function getDesiredStockStatus(action: StockAction) {
   if (action === 'reserve') return 'applied'
   if (action === 'finalize') return 'applied'
@@ -85,6 +106,12 @@ function getDesiredStockStatus(action: StockAction) {
   return 'none'
 }
 
+/**
+ * Fetches the current status snapshot for an order.
+ *
+ * @param id - The order id to fetch (typically a UUID)
+ * @returns An OrderStatusSnapshot containing `order_number`, `order_status`, `payment_status`, `shipping_status`, and `stock_status`
+ */
 async function getCurrentOrderStatus(supabaseAdmin: SupabaseAdmin, id: string) {
   const { data, error } = await supabaseAdmin
     .from('orders')
@@ -96,6 +123,12 @@ async function getCurrentOrderStatus(supabaseAdmin: SupabaseAdmin, id: string) {
   return data as OrderStatusSnapshot
 }
 
+/**
+ * Fetches order items (product ID and quantity) for a given order.
+ *
+ * @returns An array of order item snapshots, each containing `product_id` and `quantity`.
+ * @throws When the database query fails; throws `OrderStockError(400, '주문 상품 정보를 찾을 수 없습니다.')` if no items are found for the order.
+ */
 async function getOrderItems(supabaseAdmin: SupabaseAdmin, id: string) {
   const { data, error } = await supabaseAdmin
     .from('order_items')
@@ -112,6 +145,12 @@ async function getOrderItems(supabaseAdmin: SupabaseAdmin, id: string) {
   return items
 }
 
+/**
+ * Aggregate order items by product ID into total quantities.
+ *
+ * @param items - Array of order item snapshots containing `product_id` and `quantity`
+ * @returns A Map where each key is a `product_id` and each value is the summed quantity for that product
+ */
 function groupItemsByProduct(items: OrderItemSnapshot[]) {
   const grouped = new Map<string, number>()
 
@@ -122,6 +161,14 @@ function groupItemsByProduct(items: OrderItemSnapshot[]) {
   return grouped
 }
 
+/**
+ * Fetches the stock snapshot for a product by its ID.
+ *
+ * @param productId - The product identifier to look up in the `stocks` table
+ * @returns The stock snapshot containing `product_id`, `total`, and `sold`
+ * @throws OrderStockError with status 404 when the stock row is not found
+ * @throws Propagates other database errors encountered during the query
+ */
 async function readStockRow(supabaseAdmin: SupabaseAdmin, productId: string) {
   const { data, error } = await supabaseAdmin
     .from('stocks')
@@ -138,6 +185,15 @@ async function readStockRow(supabaseAdmin: SupabaseAdmin, productId: string) {
   return data as StockSnapshot
 }
 
+/**
+ * Update the stock record for a product by setting its `total` and `sold` counts.
+ *
+ * @param productId - The ID of the product whose stock row will be updated
+ * @param total - The new total inventory quantity for the product
+ * @param sold - The new sold quantity for the product
+ * @throws OrderStockError with status 404 when the stock row for `productId` does not exist
+ * @throws Any error returned by the database client for other failure cases
+ */
 async function updateStockRow(
   supabaseAdmin: SupabaseAdmin,
   productId: string,
@@ -159,6 +215,15 @@ async function updateStockRow(
   }
 }
 
+/**
+ * Inserts a stock history record for the given product.
+ *
+ * @param productId - The product's ID to which the history entry applies
+ * @param type - The history type (commonly `'in'` for restock or `'out'` for deduction)
+ * @param quantity - The quantity to record (positive integer)
+ * @param reason - A brief reason or reference for the change (e.g., an order number)
+ * @throws The database error returned by the insert operation if the insert fails
+ */
 async function insertStockHistory(
   supabaseAdmin: SupabaseAdmin,
   productId: string,
@@ -178,6 +243,15 @@ async function insertStockHistory(
   if (error) throw error
 }
 
+/**
+ * Ensures each ordered item's quantity does not exceed the current available stock.
+ *
+ * Validates grouped order items against the `stocks` table and throws if any product
+ * lacks sufficient available quantity (total - sold).
+ *
+ * @param items - Order item snapshots to validate (each contains `product_id` and `quantity`)
+ * @throws {OrderStockError} When a product's available stock is less than the requested quantity; the error has status `400` and a message including the available count.
+ */
 async function validateStockAvailability(
   supabaseAdmin: SupabaseAdmin,
   items: OrderItemSnapshot[],
@@ -197,6 +271,17 @@ async function validateStockAvailability(
   }
 }
 
+/**
+ * Apply stock mutations for an order and record corresponding stock history entries according to the requested stock action.
+ *
+ * The function groups order items by product, adjusts `stocks.total` and `stocks.sold` and inserts `stock_histories`
+ * entries for each product based on the `action` (`reserve`, `finalize`, or `restock`), then updates the order's
+ * `stock_status`.
+ *
+ * @returns The resulting `stock_status` after applying the action (`'applied'` or `'released'`).
+ * @throws OrderStockError - When requested quantities exceed available or total stock.
+ * @throws Error - Propagates errors from Supabase reads/updates/inserts when operations fail.
+ */
 async function applyStockAction(
   supabaseAdmin: SupabaseAdmin,
   orderId: string,
@@ -284,6 +369,17 @@ async function applyStockAction(
   return nextStockStatus
 }
 
+/**
+ * Updates an order row with the provided status fields and creates per-field status history entries for any changed statuses.
+ *
+ * @param supabaseAdmin - Supabase admin client used to perform the update and history inserts
+ * @param id - ID of the order to update
+ * @param data - Partial status fields to apply (e.g., `order_status`, `payment_status`, `shipping_status`)
+ * @param actorName - Actor name to record on created history entries (actor_type is `'admin'`)
+ * @param currentStatus - Current order status snapshot used to detect which status fields changed
+ * @returns The updated order row
+ * @throws If updating the order or inserting history rows fails; if the `order_status_histories` table is missing, history insertion is ignored and the updated order is still returned
+ */
 async function updateOrderStatusDirectly(
   supabaseAdmin: SupabaseAdmin,
   id: string,
@@ -353,6 +449,14 @@ async function updateOrderStatusDirectly(
   return updated
 }
 
+/**
+ * Build notifications for notable order status transitions.
+ *
+ * @param update - Incoming status fields to apply to the order.
+ * @param current - Current order status snapshot used to detect changes.
+ * @param orderId - Order identifier used to construct notification links.
+ * @returns An array of notification objects: includes a warning when `order_status` changes to `order_cancelled` and an info notification when `payment_status` changes to `refund_completed`.
+ */
 function buildOrderStatusNotifications(
   update: OrderStatusUpdateInput,
   current: OrderStatusSnapshot,
@@ -389,6 +493,13 @@ function buildOrderStatusNotifications(
   return notifications
 }
 
+/**
+ * Handle a PATCH request to update an order's status, performing stock reservation/finalization/restock when required.
+ *
+ * @param request - Incoming Request whose JSON body must conform to `orderStatusUpdateSchema` and contain one or more status fields to change.
+ * @param params - Route params promise resolving to an object with `id`, the order ID to update.
+ * @returns The updated order row as JSON on success. On validation errors returns 400 with details; on stock-related errors returns the status code and message from `OrderStockError`; on other failures returns 500 with a generic error message.
+ */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },

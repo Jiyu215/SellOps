@@ -2,8 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import type { Notification } from '@/types/dashboard'
 
 /**
- * 서버 컴포넌트(페이지)에서 초기 알림 목록을 가져온다.
- * 인증 세션이 없거나 오류 시 빈 배열을 반환한다.
+ * Fetches up to 50 most recent dashboard notifications for use in server components/pages.
+ *
+ * Returns an array of notifications (fields: `id`, `type`, `level`, `title`, `message`, `link`, `is_read`, `created_at`) ordered newest first. Returns an empty array if no notifications are found or if an error occurs (for example, when a session is not available).
+ *
+ * @returns An array of `Notification` objects (up to 50), empty if none or on error.
  */
 export async function getInitialNotifications(): Promise<Notification[]> {
   try {

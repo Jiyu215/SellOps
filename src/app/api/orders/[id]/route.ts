@@ -3,6 +3,12 @@ import { requireAuth } from '@/lib/api/requireAuth'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { getOrderDetail } from '@/dal/orders'
 
+/**
+ * Handle GET requests for a single order by authenticating the request and returning the order details for the route `id`.
+ *
+ * @param params - A promise that resolves to an object with an `id` string identifying the order
+ * @returns A NextResponse containing the order object on success; the authentication response when authentication fails; a 404 JSON error `{ error: '주문을 찾을 수 없습니다.' }` when the order is not found; or a 500 JSON error `{ error: '주문 상세 조회에 실패했습니다.' }` on unexpected failure
+ */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },

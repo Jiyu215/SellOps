@@ -6,6 +6,13 @@ import { requireAuth } from '@/lib/api/requireAuth'
 import { createNotification } from '@/lib/notifications'
 
 
+/**
+ * Fetches a paginated list of products with stock information, optional search and status filters, configurable sorting, and a resolved list image URL for each product.
+ *
+ * The response also includes a status summary computed across all products (not limited by current filters).
+ *
+ * @returns An object containing `items` (product records augmented with `list_image_url`), `total` (total matching count), `page`, `limit`, and `summary` (counts by status: `total`, `active`, `hidden`, `sold_out`).
+ */
 export async function GET(request: Request) {
   const auth = await requireAuth()
   if (!auth.ok) return auth.response
@@ -110,6 +117,16 @@ export async function GET(request: Request) {
   }
 }
 
+/**
+ * Create a new product from the request body and return the inserted product record.
+ *
+ * Parses the request JSON as a ProductCreateBody, inserts a new row into `products`,
+ * ensures an associated `stocks` record exists, and enqueues a product-created notification.
+ * If the provided `product_code` is already in use, responds with HTTP 409 and an error message.
+ * On unexpected failures, responds with HTTP 500 and an error message.
+ *
+ * @returns The inserted product record (returned with HTTP 201 on success).
+ */
 export async function POST(request: Request) {
   const auth = await requireAuth()
   if (!auth.ok) return auth.response

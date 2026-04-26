@@ -20,6 +20,13 @@ type AdjustStockErr =
 
 type AdjustRpcResult = AdjustStockOk | AdjustStockErr
 
+/**
+ * Handles authenticated POST requests to adjust a product's stock and triggers inventory notifications.
+ *
+ * @param request - The incoming HTTP request containing the adjustment payload.
+ * @param params - An object with a promise resolving to route parameters; `id` is the target product ID.
+ * @returns A NextResponse JSON payload containing the RPC result on success; on failure a JSON error object with an appropriate HTTP status (400 for validation or invalid adjustment, 404 for missing product/stock, 500 for internal errors).
+ */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

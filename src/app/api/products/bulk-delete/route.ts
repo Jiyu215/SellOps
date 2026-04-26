@@ -3,7 +3,11 @@ import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/requireAuth'
 import { createNotification } from '@/lib/notifications'
 
-/** Storage에서 product_images 버킷의 파일들을 일괄 삭제 */
+/**
+ * Deletes files from the Supabase `product-images` storage bucket for the given product IDs.
+ *
+ * @param productIds - Product IDs whose associated storage files (as recorded in `product_images.url`) will be removed
+ */
 async function deleteStorageImages(productIds: string[]): Promise<void> {
   const supabaseAdmin = getSupabaseAdmin()
   const { data: images } = await supabaseAdmin
@@ -22,6 +26,18 @@ async function deleteStorageImages(productIds: string[]): Promise<void> {
   }
 }
 
+/**
+ * Handles bulk deletion of products and their associated storage images using provided product IDs.
+ *
+ * Authenticates the caller, removes related files from the `product-images` storage bucket, then attempts to delete products via the `delete_products` RPC. If the RPC is unavailable (`PGRST202`), performs direct deletions in dependency order (`stock_histories`, `product_images`, `stocks`, then `products`). Emits a notification on successful deletion.
+ *
+ * @param request - HTTP request whose JSON body must include `{ ids: string[] }`
+ * @returns A JSON HTTP response:
+ *  - `200` with `{ success: true }` when deletion succeeds,
+ *  - `400` with `{ error: '선택된 상품이 없습니다.' }` when `ids` is missing or empty,
+ *  - `500` with `{ error: '삭제에 실패했습니다.' }` on unexpected errors.
+ *  If authentication fails, returns the response provided by `requireAuth()`.
+ */
 export async function DELETE(request: Request) {
   const auth = await requireAuth()
   if (!auth.ok) return auth.response

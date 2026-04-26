@@ -121,6 +121,17 @@ const ShortTermTooltip = ({ active, payload, label }: ChartTooltipProps<Enriched
 const buildRevenueDotRenderer = (
   enriched: EnrichedDailyPoint[],
 ): ((props: DotItemDotProps) => React.ReactElement) => {
+  /**
+   * Render the SVG marker for a revenue data point, with visual variants for anomalies and today.
+   *
+   * Renders an empty group when coordinates or the corresponding data point are missing. If the point's
+   * percent change meets or exceeds the anomaly threshold, renders prominent concentric circles colored
+   * to indicate growth or decline. Otherwise renders a distinct marker for today's point and a smaller
+   * default marker for all other points.
+   *
+   * @param index - Index of the data point in the enriched dataset used to determine marker styling
+   * @returns An SVG element representing the revenue marker for the chart
+   */
   function RevenueDot({ cx, cy, index }: DotItemDotProps): React.ReactElement {
     if (cx == null || cy == null) return <g />;
 

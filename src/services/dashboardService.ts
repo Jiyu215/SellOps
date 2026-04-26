@@ -8,10 +8,14 @@ interface DashboardOrderQuery {
 }
 
 /**
- * 대시보드 전체 데이터 로드
+ * Load the initial dashboard data from the backend.
  *
- * - /api/dashboard에서 대시보드 첫 화면 데이터를 조회한다.
- * - 주문 테이블은 search/orderStatus/page/limit 쿼리를 함께 전달한다.
+ * The function requests `/api/dashboard` and appends any provided order query
+ * parameters (`search`, `orderStatus`, `page`, `limit`) to the request URL.
+ *
+ * @param query - Optional ordering and pagination filters sent as URL query parameters
+ * @returns The dashboard payload parsed from the JSON response as `DashboardData`
+ * @throws Error when the HTTP response has a non-OK status
  */
 export async function getDashboardData(query: DashboardOrderQuery = {}): Promise<DashboardData> {
   const params = new URLSearchParams();

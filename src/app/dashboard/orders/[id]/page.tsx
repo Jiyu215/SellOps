@@ -12,6 +12,12 @@ interface OrderDetailPageProps {
   params: Promise<{ id: string }>
 }
 
+/**
+ * Produce page metadata for the order detail page.
+ *
+ * @param params - A promise resolving to route params containing `id`
+ * @returns The page metadata object with `title`: `주문 {orderNumber} | SellOps` when the order exists, otherwise `주문 상세`
+ */
 export async function generateMetadata({ params }: OrderDetailPageProps) {
   const { id } = await params
   const order = await getOrderDetail(getSupabaseAdmin(), id)
@@ -21,6 +27,15 @@ export async function generateMetadata({ params }: OrderDetailPageProps) {
   }
 }
 
+/**
+ * Render the order detail page for a given order ID.
+ *
+ * Loads the order details and required dashboard data (current user, memo actor, and initial notifications).
+ * If the order does not exist, triggers Next.js not-found handling.
+ *
+ * @param params - A promise resolving to an object containing the `id` of the order
+ * @returns The React element for the order detail dashboard page
+ */
 export default async function OrderDetailPage({ params }: OrderDetailPageProps) {
   const { id } = await params
   const [order, currentUser, currentMemoActor, notifications] = await Promise.all([

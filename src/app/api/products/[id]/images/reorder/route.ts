@@ -2,6 +2,14 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/requireAuth'
 
+/**
+ * Reorders images for a product by updating each image's `order` value in the database.
+ *
+ * Requires authentication; if authentication fails, the handler returns the authentication response.
+ *
+ * @param params - A promise resolving to route parameters; must provide `id` as the product identifier
+ * @returns `{ success: true }` on success; the authentication response if unauthorized; otherwise `{ error: '순서 변경에 실패했습니다.' }` with HTTP status 500 on failure
+ */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

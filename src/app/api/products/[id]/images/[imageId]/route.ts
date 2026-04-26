@@ -2,6 +2,15 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/requireAuth'
 
+/**
+ * Deletes a product image and its stored file for the specified product.
+ *
+ * @param params - A promise that resolves to an object with `id` (product id) and `imageId` (image id) extracted from the route
+ * @returns A JSON `NextResponse`:
+ * - `{ success: true }` on successful deletion
+ * - `{ error: '이미지를 찾을 수 없습니다.' }` with HTTP 404 if the image record is not found
+ * - `{ error: '이미지 삭제에 실패했습니다.' }` with HTTP 500 on any other failure
+ */
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string; imageId: string }> }

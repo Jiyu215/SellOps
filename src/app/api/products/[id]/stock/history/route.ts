@@ -2,6 +2,13 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/requireAuth'
 
+/**
+ * Retrieve paginated stock history entries for a specific product.
+ *
+ * @param request - The incoming HTTP request, used to read query parameters `page` and `limit`
+ * @param params - A promise resolving to route parameters; must include `id` as the product identifier
+ * @returns A JSON response containing `{ items, total, page, limit }` on success; if authentication fails returns the auth failure response, and on error returns `{ error: '재고 이력 조회에 실패했습니다.' }` with status 500
+ */
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

@@ -2,6 +2,13 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/requireAuth'
 
+/**
+ * Marks all notifications with `is_read = false` as read.
+ *
+ * Requires authentication; if authentication fails, the authentication response is returned.
+ *
+ * @returns On success, a JSON object `{ success: true }`. On failure, a JSON error message and HTTP status `500`.
+ */
 export async function POST() {
   const auth = await requireAuth()
   if (!auth.ok) return auth.response

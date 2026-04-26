@@ -10,6 +10,13 @@ const STATUS_LABELS: Record<ProductStatus, string> = {
   sold_out: '품절',
 }
 
+/**
+ * Updates the status of multiple products and returns a JSON response indicating the outcome.
+ *
+ * Attempts to update the `status` and `updated_at` fields for the products whose `id` values are provided.
+ *
+ * @returns A `NextResponse` containing `{ success: true }` on success; otherwise a JSON error object with status `400` when no product ids are provided, status `500` on internal failure, or the authentication response when authentication fails.
+ */
 export async function PATCH(request: Request) {
   const auth = await requireAuth()
   if (!auth.ok) return auth.response

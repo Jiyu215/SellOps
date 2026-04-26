@@ -3,6 +3,15 @@ import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/requireAuth'
 import { orderMemoCreateSchema } from '@/features/orders/schemas/order.schema'
 
+/**
+ * Create a new admin-authored order memo for the order identified by the route `id`.
+ *
+ * Validates the request body against `orderMemoCreateSchema` and inserts a row into the `order_memos` table with `author_type` set to `'admin'` and `author_name` derived from the authenticated user.
+ *
+ * @param request - HTTP request whose JSON body must conform to `orderMemoCreateSchema` (contains `content`)
+ * @param params - Route parameters promise resolving to an object with `id`, the target order's identifier
+ * @returns The newly created `order_memos` row
+ */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },

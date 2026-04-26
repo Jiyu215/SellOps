@@ -6,7 +6,14 @@ import type {
   StockHistory,
 } from '@/features/products/types/product.type'
 
-// 상품 상세 조회
+/**
+ * Fetches detailed information for a product by its ID.
+ *
+ * @param id - The product's unique identifier
+ * @returns The product detail object
+ * @throws Error('NOT_FOUND') when the product does not exist (HTTP 404)
+ * @throws Error('상품 조회 실패') for other HTTP error responses
+ */
 export async function fetchProductDetail(id: string): Promise<ProductDetail> {
   const res = await fetch(`/api/products/${id}`, { cache: 'no-store' })
   if (!res.ok) {
@@ -16,7 +23,13 @@ export async function fetchProductDetail(id: string): Promise<ProductDetail> {
   return res.json()
 }
 
-// 상품 생성
+/**
+ * Creates a new product.
+ *
+ * @param body - Product creation payload
+ * @returns An object containing the created product's `id`
+ * @throws Error if the server responds with an error; message is the server-provided `error` or '상품 등록 실패'
+ */
 export async function createProduct(body: ProductCreateBody): Promise<{ id: string }> {
   const res = await fetch('/api/products', {
     method: 'POST',
@@ -30,7 +43,13 @@ export async function createProduct(body: ProductCreateBody): Promise<{ id: stri
   return res.json()
 }
 
-// 상품 수정
+/**
+ * Updates an existing product by its identifier.
+ *
+ * @param id - The product identifier
+ * @param body - The update payload containing product fields to change
+ * @throws Error - Throws `Error('상품 수정 실패')` when the server responds with a non-OK status
+ */
 export async function updateProduct(id: string, body: ProductUpdateBody): Promise<void> {
   const res = await fetch(`/api/products/${id}`, {
     method: 'PATCH',
@@ -40,7 +59,13 @@ export async function updateProduct(id: string, body: ProductUpdateBody): Promis
   if (!res.ok) throw new Error('상품 수정 실패')
 }
 
-// 상품코드 중복 확인
+/**
+ * Determines whether a product code is available.
+ *
+ * @param code - The product code to check for availability
+ * @param excludeId - Optional product ID to exclude from the check (useful when validating an existing product)
+ * @returns `true` if the code is available, `false` otherwise
+ */
 export async function checkProductCode(
   code: string,
   excludeId?: string
@@ -52,7 +77,16 @@ export async function checkProductCode(
   return available
 }
 
-// 이미지 업로드
+/**
+ * Uploads an image file for a product.
+ *
+ * @param productId - The product identifier to attach the image to
+ * @param file - The image file to upload
+ * @param type - A string describing the image category or role
+ * @param order - Optional display order for the image
+ * @returns The created image resource returned by the server
+ * @throws Error when the server responds with a non-OK status; message is the server `error` field or `"이미지 업로드 실패"`
+ */
 export async function uploadImage(
   productId: string,
   file: File,
@@ -75,7 +109,13 @@ export async function uploadImage(
   return res.json()
 }
 
-// 이미지 삭제
+/**
+ * Delete an image associated with a product.
+ *
+ * @param productId - The product identifier
+ * @param imageId - The image identifier
+ * @throws Error when the HTTP request fails (non-OK response)
+ */
 export async function deleteImage(productId: string, imageId: string): Promise<void> {
   const res = await fetch(`/api/products/${productId}/images/${imageId}`, {
     method: 'DELETE',
@@ -83,7 +123,13 @@ export async function deleteImage(productId: string, imageId: string): Promise<v
   if (!res.ok) throw new Error('이미지 삭제 실패')
 }
 
-// 이미지 순서 변경
+/**
+ * Update the display order of images for a product.
+ *
+ * @param productId - The product identifier whose images will be reordered
+ * @param orders - Array of objects specifying each image's `id` and its new `order`
+ * @throws Error - `'순서 변경 실패'` when the server responds with a non-OK status
+ */
 export async function reorderImages(
   productId: string,
   orders: Array<{ id: string; order: number }>
@@ -96,7 +142,14 @@ export async function reorderImages(
   if (!res.ok) throw new Error('순서 변경 실패')
 }
 
-// 재고 조정
+/**
+ * Adjusts the stock for a specific product.
+ *
+ * @param productId - The identifier of the product whose stock will be adjusted
+ * @param body - Details of the stock adjustment (quantity, reason, metadata, etc.)
+ * @returns The parsed JSON response returned by the server
+ * @throws Error when the request fails; the error message is the server-provided `error` field or `'재고 조정 실패'`
+ */
 export async function adjustStock(productId: string, body: StockAdjustBody) {
   const res = await fetch(`/api/products/${productId}/stock/adjust`, {
     method: 'POST',
@@ -110,7 +163,14 @@ export async function adjustStock(productId: string, body: StockAdjustBody) {
   return res.json()
 }
 
-// 재고 이력 조회
+/**
+ * Fetches paginated stock history for a specific product.
+ *
+ * @param productId - The product identifier
+ * @param page - Page number to retrieve, starting at 1 (default: 1)
+ * @param limit - Number of records per page (default: 20)
+ * @returns An object with `items` (array of stock history records) and `total` (total number of records)
+ */
 export async function fetchStockHistory(
   productId: string,
   page = 1,

@@ -4,6 +4,13 @@ import type {
   ProductStatus,
 } from '@/features/products/types/product.type'
 
+/**
+ * Fetches a product list using the provided query parameters.
+ *
+ * @param query - Query object; when present, the following fields are sent as URL parameters: `search`, `status`, `sort`, `page`, and `limit`
+ * @returns The parsed `ProductListResponse` from the response body
+ * @throws Error - `상품 목록 조회 실패` if the HTTP response status is not OK
+ */
 export async function fetchProductList(
   query: ProductListQuery
 ): Promise<ProductListResponse> {
@@ -22,6 +29,13 @@ export async function fetchProductList(
   return res.json() as Promise<ProductListResponse>
 }
 
+/**
+ * Update the status for multiple products.
+ *
+ * @param ids - Array of product IDs to update
+ * @param status - New product status to apply to each specified product
+ * @throws Error when the server responds with a non-OK status
+ */
 export async function bulkUpdateStatus(
   ids: string[],
   status: ProductStatus
@@ -34,6 +48,12 @@ export async function bulkUpdateStatus(
   if (!res.ok) throw new Error('상태 변경 실패')
 }
 
+/**
+ * Deletes multiple products identified by the given IDs.
+ *
+ * @param ids - Array of product IDs to delete
+ * @throws Error when the server responds with a non-OK status indicating deletion failure
+ */
 export async function bulkDeleteProducts(ids: string[]): Promise<void> {
   const res = await fetch('/api/products/bulk-delete', {
     method: 'DELETE',
@@ -43,6 +63,14 @@ export async function bulkDeleteProducts(ids: string[]): Promise<void> {
   if (!res.ok) throw new Error('삭제 실패')
 }
 
+/**
+ * Triggers a client-side download of a CSV file containing products that match the provided query.
+ *
+ * The request applies `query.search` and `query.status` as filters and saves the file as `products_YYYYMMDD.csv`.
+ *
+ * @param query - Filters used to select products; only `search` and `status` are applied
+ * @throws Error - If the server response is not OK
+ */
 export async function exportProductsCSV(query: ProductListQuery): Promise<void> {
   const params = new URLSearchParams()
   if (query.search) params.set('search', query.search)

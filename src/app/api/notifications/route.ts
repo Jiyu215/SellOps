@@ -6,6 +6,26 @@ const VALID_TYPES   = ['order', 'inventory', 'product', 'system'] as const
 const VALID_LEVELS  = ['critical', 'warning', 'info'] as const
 const VALID_PERIODS = ['today', '7d', '30d'] as const
 
+/**
+ * Handle authenticated notification list requests and return a paginated list with summary counts.
+ *
+ * @param request - Incoming request whose URL query parameters may include:
+ *   - `status` ('unread') to filter unread notifications
+ *   - `type` ('order' | 'inventory' | 'product' | 'system') to filter by notification type
+ *   - `level` ('critical' | 'warning' | 'info') to filter by severity level
+ *   - `period` ('today' | '7d' | '30d') to filter by creation time window
+ *   - `page` (number, default 1) and `limit` (number, default 20, clamped 1–100) for pagination
+ * @returns A JSON object containing:
+ *   - `items`: Array of notification records (`id`, `type`, `level`, `title`, `message`, `link`, `is_read`, `created_at`)
+ *   - `total`: Total matching rows reported by the list query
+ *   - `page`: Current page number
+ *   - `limit`: Page size
+ *   - `summary`: Aggregate counts for all notifications (not affected by the list filters):
+ *       - `total`: total notifications
+ *       - `unread`: unread notification count
+ *       - `critical`: unread critical count
+ *       - `warning`: unread warning count
+ */
 export async function GET(request: Request) {
   const auth = await requireAuth()
   if (!auth.ok) return auth.response

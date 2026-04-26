@@ -96,6 +96,14 @@ type ProductAggregate = {
   unitsSold: number;
 };
 
+/**
+ * Compute the KST "today" range as ISO timestamps.
+ *
+ * Returns the start of the current day in Korea Standard Time (00:00:00+09:00) and the start of the next day as ISO 8601 strings.
+ *
+ * @returns An object with `start` and `end` ISO 8601 timestamp strings where `start` is the KST date at 00:00:00 and `end` is the KST start of the following day.
+ * @throws Error('KST date range creation failed') if the KST date components cannot be determined
+ */
 function getKstTodayRange() {
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Seoul',
@@ -122,6 +130,12 @@ function getKstTodayRange() {
   };
 }
 
+/**
+ * Compute the current calendar month's KST start and the start of the following month as ISO timestamps.
+ *
+ * @returns An object with `start` set to the KST timestamp for the first moment of the current month and `end` set to the KST timestamp for the first moment of the next month.
+ * @throws Error('KST month range creation failed') If the locale formatter does not produce year or month parts.
+ */
 function getKstCurrentMonthRange() {
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Seoul',
@@ -146,16 +160,33 @@ function getKstCurrentMonthRange() {
   };
 }
 
+/**
+ * Get an ISO 8601 timestamp for the start of the analysis window.
+ *
+ * @returns An ISO 8601 timestamp string representing the datetime exactly ANALYSIS_WINDOW_DAYS before now
+ */
 function getAnalysisWindowStart() {
   const date = new Date();
   date.setDate(date.getDate() - ANALYSIS_WINDOW_DAYS);
   return date.toISOString();
 }
 
+/**
+ * Format a numeric value using Korean locale digit grouping and separators.
+ *
+ * @param value - The number to format
+ * @returns The formatted number string using the `ko-KR` locale
+ */
 function formatNumber(value: number) {
   return new Intl.NumberFormat('ko-KR').format(value);
 }
 
+/**
+ * Formats a Date into a Korea Standard Time month/day label.
+ *
+ * @param date - The Date to format in the Asia/Seoul time zone
+ * @returns The month and day formatted for the `ko-KR` locale (e.g., "3.14")
+ */
 function formatMonthDayLabel(date: Date) {
   return new Intl.DateTimeFormat('ko-KR', {
     timeZone: 'Asia/Seoul',
@@ -164,12 +195,24 @@ function formatMonthDayLabel(date: Date) {
   }).format(date);
 }
 
+/**
+ * Produces a compact month label in the format 'YY.M (e.g., '23.4).
+ *
+ * @param date - The date to derive the year/month from
+ * @returns The formatted month label as `'<two-digit-year>.<month-number>` (month is not zero-padded)
+ */
 function formatMonthLabel(date: Date) {
   const year = String(date.getFullYear()).slice(2);
   const month = date.getMonth() + 1;
   return `'${year}.${month}`;
 }
 
+/**
+ * Produce a KST-based calendar date key in 'YYYY-MM-DD' format for the given date.
+ *
+ * @param date - The input Date to convert to Korea Standard Time (Asia/Seoul) calendar date
+ * @returns The corresponding calendar date string in `YYYY-MM-DD` (KST)
+ */
 function getKstDateKey(date: Date) {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Seoul',
@@ -179,6 +222,12 @@ function getKstDateKey(date: Date) {
   }).format(date);
 }
 
+/**
+ * Produce the KST month key for a date in "YYYY-MM" format.
+ *
+ * @param date - The date to convert; interpreted in the Asia/Seoul (KST) time zone
+ * @returns The month key as `"YYYY-MM"` corresponding to the given date in KST
+ */
 function getKstMonthKey(date: Date) {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Seoul',
@@ -187,6 +236,12 @@ function getKstMonthKey(date: Date) {
   }).format(date);
 }
 
+/**
+ * Produce an array of KST day-start Date objects for the last `days` days ending today.
+ *
+ * @param days - Number of consecutive days to include (1 yields only today's start)
+ * @returns An array of Date objects at KST midnight (00:00:00+09:00), ordered from oldest to newest, covering the last `days` days ending with today
+ */
 function getLastNDaysKst(days: number) {
   const { start } = getKstTodayRange();
   const todayStart = new Date(start);
@@ -198,6 +253,12 @@ function getLastNDaysKst(days: number) {
   });
 }
 
+/**
+ * Generate month-start Date objects for the last N months, including the current month.
+ *
+ * @param months - The number of months to include (must be a positive integer).
+ * @returns An array of Date objects set to the first day of each month (local timezone), ordered from oldest to newest, covering the last `months` months including the current month.
+ */
 function getLastNMonthsKst(months: number) {
   const now = new Date();
   const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -209,6 +270,13 @@ function getLastNMonthsKst(months: number) {
   });
 }
 
+/**
+ * Builds two consecutive period windows of length `days` where the later window ends at `end`.
+ *
+ * @param days - Number of days in each window
+ * @param end - End boundary for the current (later) window
+ * @returns An object with `currentStart`/`currentEnd` for the later window and `previousStart`/`previousEnd` for the immediately preceding window; each window spans `days` days and the previous window directly precedes the current window
+ */
 function createPeriodRange(days: number, end: Date): PeriodRange {
   const currentEnd = new Date(end);
   const currentStart = new Date(end);
@@ -226,6 +294,15 @@ function createPeriodRange(days: number, end: Date): PeriodRange {
   };
 }
 
+/**
+ * Builds time windows used to compute top-product comparisons for today, the last week, and the last month.
+ *
+ * The `today` entry uses KST day boundaries (start/end of the current KST day) while `week` and `month`
+ * are back-to-back ranges covering the last 7 and 30 days respectively.
+ *
+ * @returns An object with `today`, `week`, and `month` keys, each providing `currentStart`, `currentEnd`,
+ * `previousStart`, and `previousEnd` Date boundaries for comparing current and previous periods.
+ */
 function getTopProductRanges(): Record<TopProductPeriod, PeriodRange> {
   const now = new Date();
   const today = getKstTodayRange();
@@ -244,15 +321,36 @@ function getTopProductRanges(): Record<TopProductPeriod, PeriodRange> {
   };
 }
 
+/**
+ * Determines whether a date falls within the half-open interval [start, end).
+ *
+ * @param target - The date to test.
+ * @param start - The start of the interval (inclusive).
+ * @param end - The end of the interval (exclusive).
+ * @returns `true` if `target` is greater than or equal to `start` and strictly less than `end`, `false` otherwise.
+ */
 function inRange(target: Date, start: Date, end: Date) {
   return target >= start && target < end;
 }
 
+/**
+ * Calculate the percentage change from a previous revenue value to a current revenue value.
+ *
+ * @param currentRevenue - Revenue for the current period
+ * @param previousRevenue - Revenue for the previous period
+ * @returns The percent change rounded to one decimal place, or `undefined` when `previousRevenue` is less than or equal to 0
+ */
 function toPercentChange(currentRevenue: number, previousRevenue: number) {
   if (previousRevenue <= 0) return undefined;
   return Number((((currentRevenue - previousRevenue) / previousRevenue) * 100).toFixed(1));
 }
 
+/**
+ * Converts category revenue items into percentage-formatted category data points for charting.
+ *
+ * @param items - Array of objects with `name` and `revenue` for each category
+ * @returns An array of CategoryDataPoint where `value` fields are integer percentages that sum to 100 (or all zeros when total revenue is 0), and `color` values are assigned from CATEGORY_CHART_COLORS cyclically
+ */
 function toCategoryPercentages(
   items: Array<{ name: string; revenue: number }>,
 ): CategoryDataPoint[] {
@@ -294,6 +392,14 @@ function toCategoryPercentages(
     }));
 }
 
+/**
+ * Compute reorder point and safety stock from total demand observed over the analysis window.
+ *
+ * @param totalDemand - Total units demanded across the analysis window (`ANALYSIS_WINDOW_DAYS`)
+ * @returns An object with:
+ *  - `reorderPoint`: the minimum stock level to trigger reorder, computed as ceil(average daily demand * (LEAD_TIME_DAYS + SAFETY_STOCK_DAYS)) and clamped to at least 0.
+ *  - `safetyStock`: the buffer stock computed as ceil(average daily demand * SAFETY_STOCK_DAYS) and clamped to at least 0.
+ */
 function getDemandStats(totalDemand: number) {
   const averageDailyDemand = totalDemand / ANALYSIS_WINDOW_DAYS;
   const reorderPoint = Math.ceil(averageDailyDemand * (LEAD_TIME_DAYS + SAFETY_STOCK_DAYS));
@@ -305,18 +411,39 @@ function getDemandStats(totalDemand: number) {
   };
 }
 
+/**
+ * Determine the inventory risk level from available quantity and thresholds.
+ *
+ * @param available - Current available stock quantity
+ * @param reorderPoint - Reorder point threshold; when available is less than or equal to this, risk is elevated
+ * @param safetyStock - Safety stock threshold; when available is less than or equal to this, risk is critical
+ * @returns `'critical'` if `available` is less than or equal to `safetyStock`, `'warning'` if `available` is less than or equal to `reorderPoint`, `'low'` otherwise
+ */
 function getRiskLevel(available: number, reorderPoint: number, safetyStock: number): RiskLevel {
   if (available <= safetyStock) return 'critical';
   if (available <= reorderPoint) return 'warning';
   return 'low';
 }
 
+/**
+ * Map a low-stock item count to a KPI status level.
+ *
+ * @param lowStockCount - Number of inventory items considered low stock
+ * @returns `'success'` if there are zero low-stock items, `'warning'` if `lowStockCount` is less than or equal to `DASHBOARD_LOW_STOCK_LIMIT`, `'critical'` otherwise
+ */
 function getStockKpiStatus(lowStockCount: number): KPICardData['status'] {
   if (lowStockCount === 0) return 'success';
   if (lowStockCount <= DASHBOARD_LOW_STOCK_LIMIT) return 'warning';
   return 'critical';
 }
 
+/**
+ * Convert a product-with-stock database row into an InventoryItem with demand-derived reorder/safety thresholds and a risk classification.
+ *
+ * @param row - Database row for a product that may include stock fields (e.g., `stock_available`, `id`, `name`, `product_code`)
+ * @param totalDemand - Total units demanded for the product over the analysis window used to compute reorder point and safety stock
+ * @returns An InventoryItem containing `id`, `productName`, `sku`, `category` (empty string), `currentStock`, `minStock` (reorder point), `incomingStock` (0), `riskLevel`, and `unit` (`'개'`)
+ */
 function toInventoryItem(row: ProductWithStockRow, totalDemand: number): InventoryItem {
   const currentStock = row.stock_available ?? 0;
   const { reorderPoint, safetyStock } = getDemandStats(totalDemand);
@@ -334,6 +461,14 @@ function toInventoryItem(row: ProductWithStockRow, totalDemand: number): Invento
   };
 }
 
+/**
+ * Fetches today's completed and paid orders with their revenue totals.
+ *
+ * Queries orders created within the KST "today" range that are marked as completed and payment-completed and not returned, returning each order's `id` and `total_amount`.
+ *
+ * @returns An array of orders (`id` and `total_amount`) for KST today that match the completed/paid criteria
+ * @throws The Supabase query error when the database request fails
+ */
 async function getTodayRevenueOrders(supabaseAdmin: DashboardSupabaseClient) {
   const { start, end } = getKstTodayRange();
 
@@ -351,6 +486,12 @@ async function getTodayRevenueOrders(supabaseAdmin: DashboardSupabaseClient) {
   return (data ?? []) as RevenueOrderRow[];
 }
 
+/**
+ * Fetches paid and shipped orders created within the last 7 days in KST.
+ *
+ * @returns An array of `DailySalesOrderRow` containing `id`, `total_amount`, and `created_at` for orders in the 7-day window
+ * @throws The Supabase error if the database query fails
+ */
 async function getShortTermOrders(supabaseAdmin: DashboardSupabaseClient) {
   const last7Days = getLastNDaysKst(7);
   const rangeStart = last7Days[0]?.toISOString();
@@ -372,6 +513,14 @@ async function getShortTermOrders(supabaseAdmin: DashboardSupabaseClient) {
   return (data ?? []) as DailySalesOrderRow[];
 }
 
+/**
+ * Fetches orders from the last 24 months (KST month boundaries) that are paid, shipped, and not cancelled.
+ *
+ * The result covers orders from the start of the earliest month in the 24-month window up to the end of the latest month.
+ *
+ * @returns An array of order rows containing `id`, `total_amount`, and `created_at` for matched orders; an empty array if the month range cannot be determined.
+ * @throws Throws the Supabase error when the database query fails.
+ */
 async function getMonthlySalesOrders(supabaseAdmin: DashboardSupabaseClient) {
   const monthRange = getLastNMonthsKst(24);
   const rangeStart = monthRange[0]?.toISOString();
@@ -394,6 +543,11 @@ async function getMonthlySalesOrders(supabaseAdmin: DashboardSupabaseClient) {
   return (data ?? []) as MonthlySalesOrderRow[];
 }
 
+/**
+ * Fetches order IDs for completed, paid, and non-returned orders created since the analysis window start.
+ *
+ * @returns An array of objects each containing the `id` of a matching order, or an empty array if no orders are found.
+ */
 async function getDemandOrders(supabaseAdmin: DashboardSupabaseClient) {
   const demandWindowStart = getAnalysisWindowStart();
 
@@ -410,6 +564,12 @@ async function getDemandOrders(supabaseAdmin: DashboardSupabaseClient) {
   return (data ?? []) as Array<Pick<RevenueOrderRow, 'id'>>;
 }
 
+/**
+ * Get the number of orders created during the current KST day.
+ *
+ * @returns The exact count of orders with `created_at` timestamp in the KST range [today start, tomorrow start); returns `0` if no orders match.
+ * @throws The Supabase error object when the database query fails.
+ */
 async function getTodayOrderCount(supabaseAdmin: DashboardSupabaseClient) {
   const { start, end } = getKstTodayRange();
   const { count, error } = await supabaseAdmin
@@ -423,6 +583,16 @@ async function getTodayOrderCount(supabaseAdmin: DashboardSupabaseClient) {
   return count ?? 0;
 }
 
+/**
+ * Builds inventory KPI data by computing demand-aware inventory items and counting low-stock products.
+ *
+ * Fetches product stock and recent demand, converts products into inventory items (including reorder point and risk level),
+ * filters those whose current stock is less than or equal to their minimum stock, and returns the top items up to the dashboard limit.
+ *
+ * @returns An object containing:
+ *  - `inventoryItems`: an array of `InventoryItem` objects for products with `currentStock <= minStock`, limited to `DASHBOARD_LOW_STOCK_LIMIT`.
+ *  - `lowStockCount`: the total number of products where `currentStock <= minStock`.
+ */
 async function getInventoryStats(supabaseAdmin: DashboardSupabaseClient) {
   const [productResult, demandOrders] = await Promise.all([
     supabaseAdmin
@@ -465,6 +635,11 @@ async function getInventoryStats(supabaseAdmin: DashboardSupabaseClient) {
   };
 }
 
+/**
+ * Builds a 7-day KST daily series of revenue and order counts and includes the current low-stock count for each day.
+ *
+ * @returns An array of seven daily data points for the last 7 KST days. Each point contains `date` (formatted label), `revenue` (sum of total_amount for that day), `orders` (count of orders for that day), and `stockRiskCount` (the low-stock count repeated for each day).
+ */
 async function getShortTermDailyData(supabaseAdmin: DashboardSupabaseClient): Promise<DailyDataPoint[]> {
   const [orderRows, inventoryStats] = await Promise.all([
     getShortTermOrders(supabaseAdmin),
@@ -496,6 +671,15 @@ async function getShortTermDailyData(supabaseAdmin: DashboardSupabaseClient): Pr
   });
 }
 
+/**
+ * Builds a 24-month series of monthly sales metrics in KST for the last 24 months including the current month.
+ *
+ * @returns An array of 24 SalesDataPoint objects (one per month) containing:
+ * - `month`: month label in `YY.M` style
+ * - `revenue`: total revenue for that month
+ * - `orders`: total completed order count for that month
+ * - `target`: placeholder value `0`
+ */
 async function getMonthlySalesData(supabaseAdmin: DashboardSupabaseClient): Promise<SalesDataPoint[]> {
   const monthRange = getLastNMonthsKst(24);
   const orderRows = await getMonthlySalesOrders(supabaseAdmin);
@@ -607,6 +791,11 @@ const getCategoryDataCached = unstable_cache(
   { revalidate: false },
 );
 
+/**
+ * Fetches category revenue share data for the current KST month.
+ *
+ * @returns An array of category data points (`name`, `value`, `color`) where `value` is the percentage share of revenue for the month and the values sum to 100 (or are all `0` when total revenue is zero).
+ */
 async function getCategoryData(
   _supabaseAdmin: DashboardSupabaseClient,
 ): Promise<CategoryDataPoint[]> {
@@ -614,6 +803,11 @@ async function getCategoryData(
   return getCategoryDataCached(start, end);
 }
 
+/**
+ * Fetches completed, paid, and shipped orders starting from the earliest previous period used for top-product comparisons.
+ *
+ * @returns An array of `CompletedOrderRow` objects containing `id` and `created_at` for orders that are payment-completed, shipping-completed, and not cancelled.
+ */
 async function getCompletedOrdersForTopProducts(supabaseAdmin: DashboardSupabaseClient) {
   const ranges = getTopProductRanges();
   const earliestStart = new Date(
@@ -633,6 +827,13 @@ async function getCompletedOrdersForTopProducts(supabaseAdmin: DashboardSupabase
   return (data ?? []) as CompletedOrderRow[];
 }
 
+/**
+ * Aggregate order item rows into per-product sales totals for the specified orders.
+ *
+ * @param itemRows - Order item rows containing `order_id`, `product_id`, `price`, `quantity`, and product metadata
+ * @param orderIds - Set of order IDs to include in the aggregation
+ * @returns A Map keyed by `product_id` where each value is a `ProductAggregate` with cumulative `revenue` and `unitsSold` (and product metadata)
+ */
 function aggregateProductSales(itemRows: OrderItemSalesRow[], orderIds: Set<string>) {
   const aggregateMap = new Map<string, ProductAggregate>();
 
@@ -656,6 +857,13 @@ function aggregateProductSales(itemRows: OrderItemSalesRow[], orderIds: Set<stri
   return aggregateMap;
 }
 
+/**
+ * Produces the top 5 products for the current period with ranking and percent change versus a previous period.
+ *
+ * @param currentMap - Map from product id to aggregate metrics for the current period
+ * @param previousMap - Map from product id to aggregate metrics for the previous period
+ * @returns An array of up to five `TopProductItem` entries ordered by rank; each entry includes `id`, `rank`, `productName`, `sku`, `category`, `revenue`, `unitsSold`, and `changePercent` (percent change in revenue compared to the previous period, or `undefined` when previous revenue is not positive)
+ */
 function toTopProductList(
   currentMap: Map<string, ProductAggregate>,
   previousMap: Map<string, ProductAggregate>,
@@ -683,6 +891,12 @@ function toTopProductList(
     });
 }
 
+/**
+ * Build top-selling product lists for today, week, and month including prior-period comparisons.
+ *
+ * @returns An object with `today`, `week`, and `month` keys each containing an array of top products (ranked list with revenue, units sold, and percent change versus the previous period).
+ * @throws Throws the Supabase error if the `order_items` query fails.
+ */
 async function getTopProducts(supabaseAdmin: DashboardSupabaseClient) {
   const ranges = getTopProductRanges();
   const completedOrders = await getCompletedOrdersForTopProducts(supabaseAdmin);
@@ -738,6 +952,12 @@ async function getTopProducts(supabaseAdmin: DashboardSupabaseClient) {
   } satisfies Record<TopProductPeriod, TopProductItem[]>;
 }
 
+/**
+ * Parse and validate dashboard order query parameters from the request URL.
+ *
+ * @param request - The incoming Request whose URL search parameters provide dashboard order query fields
+ * @returns `{ ok: true, query: OrderListQuery }` with the cleaned query when validation succeeds; `{ ok: false, response: Response }` containing a 400 JSON response when validation fails
+ */
 function parseDashboardOrderQuery(
   request: Request,
 ):
@@ -772,6 +992,12 @@ function parseDashboardOrderQuery(
   };
 }
 
+/**
+ * Retrieves a paginated list of orders according to the dashboard order query.
+ *
+ * @param query - Filters and pagination options for the orders list
+ * @returns OrderListResponse containing the order items and pagination metadata
+ */
 async function getDashboardOrders(
   supabaseAdmin: DashboardSupabaseClient,
   query: OrderListQuery,
@@ -779,6 +1005,22 @@ async function getDashboardOrders(
   return getOrders(supabaseAdmin, query);
 }
 
+/**
+ * Handle GET /api/dashboard: authenticate the request, aggregate dashboard KPIs and datasets, and return them as JSON.
+ *
+ * @param request - The incoming Request for the dashboard route
+ * @returns A NextResponse containing a JSON object with the following keys:
+ * - `kpiData`: array of KPI card objects (revenue, orders, stock alerts)
+ * - `dailyData`: short-term daily series for the dashboard
+ * - `salesData`: monthly sales series
+ * - `categoryData`: category percentage data for the current month
+ * - `inventoryItems`: list of inventory items and their computed risk/minimums
+ * - `orders`: recent order items according to the parsed query
+ * - `ordersPagination`: pagination info `{ total, page, limit }` for `orders`
+ * - `topProducts`: top products lists for today, week, and month
+ *
+ * On authentication or query validation failure the function returns the corresponding error response; on internal failure it returns HTTP 500 with `{ error: '대시보드 데이터를 불러오지 못했습니다.' }`.
+ */
 export async function GET(request: Request) {
   const auth = await requireAuth();
   if (!auth.ok) return auth.response;

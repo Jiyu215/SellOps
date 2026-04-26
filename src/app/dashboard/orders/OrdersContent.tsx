@@ -59,6 +59,13 @@ export const OrdersContent = ({
 
     let ignore = false;
 
+    /**
+     * Fetches the order list for the current query and updates component state with the response or records an error.
+     *
+     * On success, updates `orders`, `total`, `page`, and `limit`, and clears any existing error message.
+     * On failure, sets `errorMsg` to `'주문 목록 조회에 실패했습니다.'`.
+     * If the request is marked as ignored (stale), no state updates or error changes are made.
+     */
     async function fetchFilteredOrders() {
       try {
         const data = await fetchOrderList(query);

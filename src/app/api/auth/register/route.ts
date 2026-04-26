@@ -8,6 +8,15 @@ interface RegisterBody {
   name?: string
 }
 
+/**
+ * Creates an operator (admin) user in Supabase from the incoming request body after validating input, and returns a JSON HTTP response indicating success or failure.
+ *
+ * @returns A Next.js JSON HTTP response:
+ * - On success (201): `{ success: true, data: { id?: string, email: string } }`
+ * - On validation failure (400): `{ success: false, error: string }`
+ * - If the email is already registered (409): `{ success: false, error: string }`
+ * - On unexpected errors (500): `{ success: false, error: string }`
+ */
 export async function POST(request: Request) {
   const auth = await requireAuth()
   if (!auth.ok) return auth.response

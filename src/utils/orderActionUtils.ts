@@ -68,6 +68,14 @@ export interface ActionGroup {
   menuActions: ActionKey[]
 }
 
+/**
+ * Determine whether an order is in a terminal state.
+ *
+ * An order is terminal when any of the following is true: `orderStatus` is `'order_cancelled'`, `paymentStatus` is `'payment_cancelled'` or `'refund_completed'`, or `shippingStatus` is `'return_completed'`.
+ *
+ * @param order - The order to evaluate
+ * @returns `true` if the order is terminal, `false` otherwise
+ */
 function isTerminalOrder(order: Order) {
   return (
     order.orderStatus === 'order_cancelled' ||
@@ -77,6 +85,15 @@ function isTerminalOrder(order: Order) {
   )
 }
 
+/**
+ * Determines which primary and menu actions are available for an order based on its statuses.
+ *
+ * Evaluates the order's `orderStatus`, `paymentStatus`, and `shippingStatus` to produce the set
+ * of actionable `ActionKey`s. Returns empty action arrays for terminal orders or when no rule matches.
+ *
+ * @param order - The order whose `orderStatus`, `paymentStatus`, and `shippingStatus` are used to select actions
+ * @returns An `ActionGroup` containing `primaryActions` (main action keys shown prominently) and `menuActions` (secondary action keys shown in a menu)
+ */
 export function getActionsForOrder(order: Order): ActionGroup {
   const { orderStatus, paymentStatus, shippingStatus } = order
 
@@ -127,6 +144,12 @@ export function getActionsForOrder(order: Order): ActionGroup {
   return { primaryActions: [], menuActions: [] }
 }
 
+/**
+ * Retrieve the order state transition payload associated with an action key.
+ *
+ * @param actionKey - The action identifier whose transition mapping to fetch
+ * @returns The `OrderTransition` object that specifies status fields to update for `actionKey`
+ */
 export function getTransitionForAction(actionKey: ActionKey): OrderTransition {
   return TRANSITIONS[actionKey]
 }

@@ -6,11 +6,13 @@ import { getDashboardUser } from '@/lib/dashboard/currentUser';
 import { getInitialNotifications } from '@/lib/dashboard/getInitialNotifications';
 
 /**
- * 대시보드 메인 페이지 (Server Component)
+ * Render the dashboard page shell on the server and defer client-side content rendering.
  *
- * - 레이아웃은 서버에서 렌더링
- * - 실제 콘텐츠는 DashboardContent(Client)가 비동기로 로드
- * - useSearchParams 기반 주문 필터를 위해 Suspense로 감싼다
+ * Fetches the current dashboard user and initial notifications concurrently, passes them
+ * into the server-rendered DashboardLayout, and wraps the client DashboardContent in a
+ * Suspense boundary that shows DashboardSkeleton as a fallback.
+ *
+ * @returns The rendered dashboard page React element
  */
 export default async function DashboardPage() {
   const [currentUser, notifications] = await Promise.all([

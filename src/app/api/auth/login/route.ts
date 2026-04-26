@@ -4,6 +4,12 @@ import type { Database } from '@/types/supabase'
 
 const MAX_AGE = 60 * 60 * 24 * 30
 
+/**
+ * Authenticate a user with Supabase using an email and password, apply session cookies, and return a JSON response with the authenticated user.
+ *
+ * @param request - NextRequest whose JSON body must include `email` and `password`
+ * @returns A NextResponse with JSON `{ success, data, error }`. On success `data` is `{ id, email, name }` and the response is 200. If credentials are invalid the response is 401 with `error: '이메일 또는 비밀번호가 올바르지 않습니다.'`. On unexpected failures the response is 500 with `error: '서버 오류가 발생했습니다.'`.
+ */
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json() as {

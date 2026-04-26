@@ -7,13 +7,13 @@ import type { ProductFormData, ProductDetail, ProductStatus } from '@/types/prod
 // ── 상품 저장 서버 액션 ───────────────────────────────────────────────────────
 
 /**
- * 상품 생성 또는 수정 서버 액션
- * 신규: Supabase admin 클라이언트로 직접 처리
- * 수정: Supabase admin 클라이언트로 직접 처리
+ * Create a new product or update an existing product in Supabase; when creating, initialize stock and record initial inbound history.
  *
- * @param data         - 폼 데이터
- * @param id           - 수정 시 상품 ID (없으면 신규 생성)
- * @param initialStock - 신규 등록 시 초기 재고 (폼에서 미리 조정한 값)
+ * @param data - Product form values to persist
+ * @param id - If provided, updates the existing product with this ID; if omitted, creates a new product
+ * @param initialStock - Initial stock totals used only on creation; when provided, sets stock and records an inbound history entry
+ * @returns An object containing the saved product `id`; when a new product is created, includes a `product` field with the created ProductDetail
+ * @throws Error when product creation or update fails
  */
 export async function saveProductAction(
   data: ProductFormData,

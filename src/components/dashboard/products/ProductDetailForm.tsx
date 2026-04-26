@@ -75,7 +75,17 @@ const STATUS_DESCRIPTIONS: Record<ProductStatus, string> = {
   sold_out: '고객 노출, 구매 불가',
 };
 
-// ── 이미지 API 헬퍼 ──────────────────────────────────────────────────────────
+/**
+ * Uploads a product image file to the server and returns the created image's metadata.
+ *
+ * @param productId - The product's identifier to associate the uploaded image with
+ * @param file - The image File to upload
+ * @param type - The image type (e.g., `main`, `list`, `small`, `thumbnail`, `extra`)
+ * @param order - Optional order index for `extra` images
+ * @returns The created image record containing `id`, `type`, `url`, `fileName`, `fileSize` (in bytes), optional `order`, and `createdAt`
+ *
+ * @throws Error if the API responds with a non-OK status; the error message contains the server-provided message when available or a fallback message
+ */
 
 async function uploadImageViaApi(
   productId: string,
@@ -108,6 +118,13 @@ async function uploadImageViaApi(
   };
 }
 
+/**
+ * Deletes an image belonging to a product on the server.
+ *
+ * @param productId - ID of the product that owns the image
+ * @param imageId - ID of the image to delete
+ * @throws Error when the server responds with an error or deletion fails
+ */
 async function deleteImageViaApi(productId: string, imageId: string): Promise<void> {
   const res = await fetch(`/api/products/${productId}/images/${imageId}`, { method: 'DELETE' });
   if (!res.ok) {
@@ -116,7 +133,12 @@ async function deleteImageViaApi(productId: string, imageId: string): Promise<vo
   }
 }
 
-// ── 임시저장 키 생성 ──────────────────────────────────────────────────────────
+/**
+ * Builds the localStorage key used to save or retrieve a product draft.
+ *
+ * @param productId - The product's ID, or `null` to indicate a new (unsaved) product
+ * @returns The draft storage key string in the form `sellops_product_draft_user_{id|new}`
+ */
 
 function getDraftKey(productId: string | null): string {
   return `sellops_product_draft_user_${productId ?? 'new'}`;
@@ -130,7 +152,12 @@ export interface ProductDetailFormProps {
   categoryOptions?: ProductCategoryOption[];
 }
 
-// ── 폼 초기값 ─────────────────────────────────────────────────────────────────
+/**
+ * Create initial form data for a product form, optionally seeded from an existing product.
+ *
+ * @param product - Optional product whose editable fields will be used to populate the form
+ * @returns A ProductFormData object populated from `product` when provided; otherwise an object with empty fields and `status` set to `"active"`
+ */
 
 function getInitialFormData(product?: ProductDetail): ProductFormData {
   if (!product) {

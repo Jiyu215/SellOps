@@ -7,13 +7,20 @@ import type { Notification } from '@/types/dashboard';
 const POLL_INTERVAL_MS = 30_000;
 
 /**
- * 알림 상태 관리 훅
+ * Manage a client-side notification list with realtime updates, manual refresh, visibility-triggered refetch, and polling fallback.
  *
- * 데이터 반영 우선순위:
- * 1. Supabase Realtime INSERT/UPDATE/DELETE 이벤트 즉시 반영
- * 2. 벨 클릭 시 즉시 fetch
- * 3. 탭 복귀 시 즉시 fetch
- * 4. 30초 폴링 fallback
+ * Keeps local notifications state initialized from `initial` and updates it in the following priority:
+ * 1. Supabase realtime INSERT/UPDATE/DELETE events
+ * 2. Explicit refresh calls
+ * 3. Page visibility changes (refetch when tab becomes visible)
+ * 4. Periodic polling (every POLL_INTERVAL_MS)
+ *
+ * @param initial - Initial array of notifications used to seed local state
+ * @returns An object with:
+ *   - `notifications`: the current notification list
+ *   - `refresh`: fetches the latest notifications from the server and replaces local state (guards against concurrent requests)
+ *   - `markRead(id)`: optimistically marks a single notification as read locally and sends a PATCH to the server; network failures are ignored
+ *   - `markAllRead()`: optimistically marks all notifications as read locally and sends a POST to the server; network failures are ignored
  */
 export function useNotifications(initial: Notification[]) {
   const [notifications, setNotifications] = useState<Notification[]>(initial);

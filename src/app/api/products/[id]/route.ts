@@ -4,6 +4,17 @@ import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/api/requireAuth'
 import { productUpdateSchema } from '@/features/products/schemas/product.schema'
 
+/**
+ * Fetches a product by `id` and returns the product enriched with category name, computed stock availability, and ordered images.
+ *
+ * @param params - Promise resolving to route parameters; must include `id`
+ * @returns A NextResponse JSON containing the product fields plus:
+ * - `category_id` (null when absent)
+ * - `category_name` (string)
+ * - `stock` (object with `product_id`, `total`, `sold`, `available`)
+ * - `images` (ordered array)
+ * On failure returns an error JSON (404 when not found, 500 on server error).
+ */
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -68,6 +79,13 @@ export async function GET(
   }
 }
 
+/**
+ * Deletes a product and all related storage files and database records by product id.
+ *
+ * @param _req - Incoming request object (unused).
+ * @param params - Route parameters containing `id` of the product to delete.
+ * @returns `{ success: true }` when the product and its related records were removed successfully.
+ */
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -122,6 +140,11 @@ export async function DELETE(
   }
 }
 
+/**
+ * Update fields of a product identified by `id` after validating the request body against `productUpdateSchema`.
+ *
+ * @returns The updated product row as returned from the database.
+ */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

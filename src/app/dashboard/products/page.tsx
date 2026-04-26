@@ -9,10 +9,14 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import type { ProductListItem, ProductStatus } from '@/types/products';
 
 /**
- * 상품 관리 페이지 (Server Component)
+ * Render the products management page with an initial list of products loaded from the database.
  *
- * - Supabase에서 직접 상품 목록을 조회하여 initialProducts로 전달
- * - revalidatePath 후 서버 재렌더 시 최신 목록 자동 반영
+ * Fetches the current dashboard user and initial notifications, loads products (with stock fields)
+ * and one prioritized image per product (priority: list → thumbnail → small → main), converts
+ * database rows into `ProductListItem` entries, and renders the dashboard layout containing
+ * `ProductsContent` preloaded with those items.
+ *
+ * @returns A React element containing the dashboard layout and products content populated with the initial product list.
  */
 export default async function ProductsPage() {
   const [currentUser, notifications] = await Promise.all([

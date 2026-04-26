@@ -1,7 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/supabase'
 
-// RLS 우회 — Route Handler 서버 측에서만 사용
+/**
+ * Creates a Supabase client configured with the service-role (admin) credential for server-side use.
+ *
+ * This client is intended for server-only operations that require elevated privileges and will operate with
+ * the project's service-role key, allowing actions that bypass Row Level Security.
+ *
+ * @returns A Supabase client instance authenticated with the project's service-role key, typed to `Database`.
+ */
 export function getSupabaseAdmin() {
   return createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

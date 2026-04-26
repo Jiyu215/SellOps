@@ -2,13 +2,16 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 /**
- * 미들웨어: Supabase Auth 기반 인증 가드
+ * Controls routing based on Supabase session authentication.
  *
- * - 비로그인 사용자 → /auth/login 으로 리다이렉트
- * - 로그인 상태 → /auth 페이지 접근 시 /dashboard로 리다이렉트
- * - 그 외 요청 → 그대로 통과
+ * Checks the Supabase session cookie to determine the current user and:
+ * - Redirects unauthenticated requests (except API routes and the auth pages) to `/auth/login`.
+ * - Redirects authenticated requests that try to access `/auth/*` (except `/auth/register`) to `/dashboard/dashboard`.
+ * - Otherwise allows the request to continue.
  *
- * ※ Supabase session cookie 기반으로 user 상태를 확인한다
+ * The response returned for non-redirect cases is a NextResponse that carries request headers and any Supabase cookies synchronized from the incoming request.
+ *
+ * @returns A NextResponse that is either a redirect to the appropriate auth or dashboard route, or a pass-through response allowing the request to proceed.
  */
 
 export async function middleware(request: NextRequest) {

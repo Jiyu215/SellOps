@@ -27,30 +27,20 @@ export interface UseSearchInputReturn {
 }
 
 /**
- * 검색 입력 훅 — debounce + 한글 IME 처리
+ * Manages a search input with debounce and correct handling for Hangul IME composition.
  *
- * ### 한글 IME 처리 전략
- * 브라우저는 한글 조합 중(ㅎ→하→한)에도 onChange를 발화하므로,
- * 부분 완성 문자열로 URL 쿼리가 매 키스트로크마다 갱신되는 문제가 발생한다.
+ * Ensures composition (IME) does not trigger intermediate searches, debounces normal typing,
+ * immediately triggers search when composition ends, prevents duplicate searches for the same
+ * normalized value, and aborts any in-flight work when new searches start or on unmount.
  *
- * - `onCompositionStart`: 조합 중 플래그 ON → onChange에서 검색 보류
- * - `onCompositionEnd`: 조합 완료 → debounce 없이 즉시 검색 실행
- * - Chrome 이벤트 순서: compositionEnd → onChange (동일 값으로 중복 발화)
- *   → lastTriggeredRef로 마지막 실행 값 추적, 동일 값 재호출 차단
- *
- * ### AbortController
- * 현재는 동기 클라이언트 필터링이라 취소 효과 없음.
- * 실제 API 연동 시 `onSearch(value, signal)` 형태로 확장해
- * 이전 요청을 취소하고 최신 응답만 반영할 수 있다.
- *
- * @example
- * ```tsx
- * const { inputValue, ...handlers } = useSearchInput({
- *   initialValue: filter.search,
- *   onSearch: handleSearch,
- * });
- * <input value={inputValue} {...handlers} />
- * ```
+ * @param initialValue - Initial input text (used to restore URL/bookmarked state). The hook only syncs this into local state when the user has not locally diverged.
+ * @param onSearch - Called with the normalized search string (whitespace removed) when a search is confirmed.
+ * @param delay - Debounce delay in milliseconds applied to normal typing (defaults to SEARCH_DEBOUNCE_DELAY_MS).
+ * @returns An object containing:
+ *  - `inputValue`: local input string used for rendering.
+ *  - `onInputChange`: change handler for the input element.
+ *  - `onCompositionStart`: IME composition start handler.
+ *  - `onCompositionEnd`: IME composition end handler that triggers an immediate search.
  */
 export function useSearchInput({
   initialValue = '',

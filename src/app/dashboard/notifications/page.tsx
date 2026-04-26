@@ -12,11 +12,33 @@ type NotificationsPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
+/**
+ * Get the first value for a query parameter key.
+ *
+ * @param params - Record of query parameters where values may be a string, an array of strings, or `undefined`
+ * @param key - The parameter name to retrieve
+ * @returns The parameter value (first element if an array) or `undefined` if not present
+ */
 function getParam(params: Record<string, string | string[] | undefined>, key: string) {
   const v = params[key];
   return Array.isArray(v) ? v[0] : v;
 }
 
+/**
+ * Fetches paginated notifications and an unread/level summary based on URL query parameters.
+ *
+ * Recognizes these query parameters in `params`: `status` (`'unread'`), `type` (`'order' | 'inventory' | 'product' | 'system'`), `level` (`'critical' | 'warning' | 'info'`), `period` (`'today' | '7d' | '30d'`), `page`, and `limit` (`20 | 50 | 100`). Applies filtering and pagination accordingly and returns the matching notification rows plus aggregate summary counts.
+ *
+ * @param params - A record of query-string values (single string or string[]). Keys listed above are interpreted for filtering and pagination.
+ * @returns An object containing:
+ *  - `items`: the page of `Notification` rows,
+ *  - `total`: the total number of rows for the paginated query,
+ *  - `summary`: aggregate counts with properties:
+ *      - `total`: total number of notifications considered for the summary,
+ *      - `unread`: number of unread notifications,
+ *      - `critical`: number of unread critical notifications,
+ *      - `warning`: number of unread warning notifications.
+ */
 async function getPageData(params: Record<string, string | string[] | undefined>) {
   const status = getParam(params, 'status')
   const type   = getParam(params, 'type')
@@ -72,6 +94,14 @@ async function getPageData(params: Record<string, string | string[] | undefined>
   }
 }
 
+/**
+ * Render the dashboard notifications page with initial user, notification and page data.
+ *
+ * Resolves optional query parameters, fetches the current dashboard user, initial notifications, and paginated notification data, and renders them inside the dashboard layout. The notifications content is wrapped in a Suspense boundary with a skeleton fallback.
+ *
+ * @param searchParams - Optional promise resolving to a record of query-string values used for filtering and pagination (e.g., `status`, `type`, `level`, `period`, `page`, `limit`).
+ * @returns The React element for the notifications page.
+ */
 export default async function NotificationsPage({ searchParams }: NotificationsPageProps) {
   const params = await searchParams ?? {}
 
